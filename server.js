@@ -196,15 +196,14 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         if (typeof w.start === 'number' && typeof w.end === 'number' && w.end > w.start) {
           kdur = Math.round((w.end - w.start) * 100);
         }
-        // Стандартный karaoke: без inline-цвета, только {\k} — активное слово подсвечивается SecondaryColour
+        // Стандартный karaoke: только {\k}, SecondaryColour и glow через стиль
         karaokeParts.push(`{\\k${kdur}}${wordText}`);
       }
       text = karaokeParts.join(' ');
     } else {
       text = typeof seg.text === 'string' ? seg.text : '';
     }
-    // Fade-in/fade-out
-    text = `{\\fad(200,200)}${text}`;
+    // Без fade
     let inline = '';
     if (seg.style) {
       if (seg.style.fontWeight && String(seg.style.fontWeight) === '800') inline += '\\b1';
