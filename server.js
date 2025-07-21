@@ -92,6 +92,83 @@ function getFFmpegStyle(style) {
   return styles[style] || styles.modern;
 }
 
+// Генерация ASS-файла с поддержкой стилей, karaoke и glow/fade
+function createASSContent(segments, videoWidth = 1920, videoHeight = 1080) {
+  // Секция Script Info
+  let ass = `[Script Info]\n` +
+    `ScriptType: v4.00+\n` +
+    `PlayResX: ${videoWidth}\n` +
+    `PlayResY: ${videoHeight}\n` +
+    `ScaledBorderAndShadow: yes\n` +
+    `\n`;
+
+  // Секция стилей (Montserrat, жирный, белый, тень, outline, glow)
+  ass += `[V4+ Styles]\n`;
+  ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
+  // Базовый стиль
+  ass += `Style: Default,Montserrat,48,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,1,2,60,60,60,1\n`;
+  // Жёлтый стиль для ключевых слов
+  ass += `Style: Highlight,Montserrat,48,&H0000D7FF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,1,2,60,60,60,1\n`;
+  // Glow стиль (neon)
+  ass += `Style: Neon,Montserrat,48,&H00FFFF00,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,4,2,60,60,60,1\n`;
+  ass += `\n`;
+
+  // Секция событий
+  ass += `[Events]\n`;
+  ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
+
+  // Генерируем события для каждого сегмента
+  segments.forEach((seg, i) => {
+    const start = assTime(seg.start);
+    const end = assTime(seg.end);
+    // Определяем стиль
+    let style = 'Default';
+    if (seg.style && seg.style.color && seg.style.color.toUpperCase() === '#FFD700') style = 'Highlight';
+    if (seg.style && seg.style.glow) style = 'Neon';
+    // Karaoke-эффект (если есть)
+    let text = seg.text;
+    if (seg.karaoke) {
+      // Длительность в десятках миллисекунд
+      const kdur = Math.round((seg.end - seg.start) * 100);
+      text = `{\\k${kdur}}${seg.text}`;
+    }
+    // Fade (если есть)
+    if (seg.style && seg.style.fade) {
+      text = `{\\fad(200,200)}${text}`;
+    }
+    // Жирность, цвет, underline, italic (ASS inline-теги)
+    let inline = '';
+    if (seg.style) {
+      if (seg.style.fontWeight && String(seg.style.fontWeight) === '800') inline += '\\b1';
+      if (seg.style.italic) inline += '\\i1';
+      if (seg.style.underline) inline += '\\u1';
+      if (seg.style.color && seg.style.color !== '#FFFFFF' && style === 'Default') {
+        // Кастомный цвет
+        inline += `\\c&H${hexToAss(seg.style.color)}&`;
+      }
+      if (seg.style.shadow !== undefined) inline += `\\shad${seg.style.shadow ? 1 : 0}`;
+    }
+    if (inline) text = `{${inline}}${text}`;
+    ass += `Dialogue: 0,${start},${end},${style},,0,0,0,,${text}\n`;
+  });
+  return ass;
+}
+
+// Вспомогательная функция: формат времени для ASS
+function assTime(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  const cs = Math.floor((sec % 1) * 100); // centiseconds
+  return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${cs.toString().padStart(2, '0')}`;
+}
+// Вспомогательная функция: hex #RRGGBB -> ASS BGR
+function hexToAss(hex) {
+  // #RRGGBB -> BBGGRR
+  const c = hex.replace('#', '');
+  return c.length === 6 ? c.slice(4,6) + c.slice(2,4) + c.slice(0,2) : 'FFFFFF';
+}
+
 // API Routes
 
 // Health check
@@ -190,12 +267,12 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
     task.progress = 30;
     task.status = 'preparing';
     
-    console.log(`📝 Creating SRT file for task ${taskId}`);
+    console.log(`📝 Creating ASS file for task ${taskId}`);
     
-    // Создаем SRT файл
-    const srtContent = createSRTContent(transcript);
-    const srtPath = path.join(TEMP_DIR, `${taskId}_subtitles.srt`);
-    await fs.writeFile(srtPath, srtContent, 'utf8');
+    // Создаем ASS файл
+    const assContent = createASSContent(transcript);
+    const assPath = path.join(TEMP_DIR, `${taskId}_subtitles.ass`);
+    await fs.writeFile(assPath, assContent, 'utf8');
     
     task.progress = 40;
     task.status = 'processing';
@@ -204,11 +281,9 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
     
     // Обрабатываем видео с FFmpeg
     const outputPath = path.join(OUTPUT_DIR, `${taskId}_output.mp4`);
-    const styleString = getFFmpegStyle(style);
-    
     await new Promise((resolve, reject) => {
       ffmpeg(videoPath)
-        .videoFilters(`subtitles=${srtPath}:force_style='${styleString}'`)
+        .videoFilters(`subtitles=${assPath}`)
         .videoCodec('libx264')
         .audioCodec('copy') // Сохраняем оригинальное аудио
         .outputOptions(['-crf', '20']) // Качество
@@ -244,7 +319,7 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
     // Очищаем временные файлы
     setTimeout(() => {
       fs.remove(videoPath).catch(console.error);
-      fs.remove(srtPath).catch(console.error);
+      fs.remove(assPath).catch(console.error);
     }, 1000);
     
   } catch (error) {
