@@ -196,9 +196,21 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         if (typeof w.start === 'number' && typeof w.end === 'number' && w.end > w.start) {
           kdur = Math.round((w.end - w.start) * 100);
         }
-        // Karaoke-цвет: активное слово выделять через {\c&H...&} если нужно
-        // Для простоты: все слова обычные, можно добавить выделение для активного (например, через SecondaryColour)
-        karaokeParts.push(`{\\k${kdur}}${wordText}`);
+        // Классический karaoke: весь текст белый, активное слово — цвет стиля + glow
+        // Для активного слова — цвет karaoke, outline/shadow увеличены
+        // После слова — возврат к белому и обычному outline/shadow
+        const isActive = true; // ASS проигрыватель сам подсвечивает активное слово через SecondaryColour
+        // Но для glow делаем inline-теги
+        let before = '';
+        let after = '';
+        if (j === 0) {
+          // Первое слово — белое
+          before = `{\\c&HFFFFFF&\\3c&H${s.outlineColor.slice(4)}&\\bord2\\shad1}`;
+        }
+        // Для активного слова (karaoke): цвет karaoke, outline/shadow увеличены
+        before += `{\\c&H${s.karaoke.slice(4)}&\\3c&H${s.karaoke.slice(4)}&\\bord4\\shad2}`;
+        after = `{\\c&HFFFFFF&\\3c&H${s.outlineColor.slice(4)}&\\bord2\\shad1}`;
+        karaokeParts.push(`${before}{\\k${kdur}}${wordText}${after}`);
       }
       text = karaokeParts.join(' ');
     } else {
