@@ -1,8 +1,11 @@
 # Используем Node.js образ с FFmpeg
 FROM node:18-alpine
 
-# Устанавливаем FFmpeg
-RUN apk add --no-cache ffmpeg
+# Установим зависимости для ffmpeg и рендеринга субтитров
+RUN apk add --no-cache curl ca-certificates fontconfig freetype ttf-dejavu
+
+# Скачиваем и устанавливаем статический ffmpeg с поддержкой всех фильтров
+RUN curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar xJ -C /usr/local/bin --strip-components=1 --wildcards '*/ffmpeg' '*/ffprobe'
 
 # Создаем рабочую директорию
 WORKDIR /app
