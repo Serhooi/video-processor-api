@@ -272,6 +272,8 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
     // Создаем ASS файл
     const assContent = createASSContent(transcript);
     const assPath = path.join(TEMP_DIR, `${taskId}_subtitles.ass`);
+    // Логируем содержимое ASS-файла для диагностики
+    console.log('ASS content:\n', assContent.slice(0, 2000)); // первые 2000 символов
     await fs.writeFile(assPath, assContent, 'utf8');
     
     task.progress = 40;
@@ -291,6 +293,9 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
         .output(outputPath)
         .on('start', (commandLine) => {
           console.log(`🔧 FFmpeg command: ${commandLine}`);
+        })
+        .on('stderr', (stderrLine) => {
+          console.log('FFmpeg stderr:', stderrLine);
         })
         .on('progress', (progress) => {
           const percent = Math.round(40 + (progress.percent || 0) * 0.5);
