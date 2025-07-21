@@ -171,10 +171,10 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
 
 function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
   const s = getASSStyles(style, videoWidth, videoHeight);
-  // Для glow outline-цвет делаем полупрозрачным (alpha=80)
+  // Цвет glow для активного слова
   function glowColor(hex) {
     // hex типа #FFD700
-    return `&H80${hex.replace('#', '').slice(4,6)}${hex.replace('#', '').slice(2,4)}${hex.replace('#', '').slice(0,2)}`;
+    return `&H${hex.replace('#', '').slice(4,6)}${hex.replace('#', '').slice(2,4)}${hex.replace('#', '').slice(0,2)}`;
   }
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
@@ -184,8 +184,8 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     `\n`;
   ass += `[V4+ Styles]\n`;
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
-  ass += `Style: Active,${s.font},${s.size},${s.karaoke},${s.karaoke},${glowColor(s.karaoke.replace('&H00','').replace('&H','').replace('FFD700','#FFD700').replace('00FFFF','#00FFFF').replace('FF4500','#FF4500').replace('D4AF37','#D4AF37'))},${s.backColor},-1,0,0,0,100,100,0,0,1,4,2,2,60,60,${s.marginV},1\n`;
-  ass += `Style: Inactive,${s.font},${s.size},${s.primary},${s.primary},${s.outlineColor},${s.backColor},-1,0,0,0,100,100,0,0,1,2,2,2,60,60,${s.marginV},1\n`;
+  // Outline и shadow не нужны в стилях, всё делаем inline-тегами
+  ass += `Style: Default,${s.font},${s.size},${s.primary},${s.primary},&H000000&,${s.backColor},-1,0,0,0,100,100,0,0,1,0,0,2,60,60,${s.marginV},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
@@ -199,21 +199,21 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         let phrase = seg.words.map((word, idx) => {
           const wordText = typeof word.text === 'string' ? word.text : '';
           if (idx === j) {
-            // Активное слово — цвет стиля + прозрачный glow
-            return `{\\b1\\c&H${s.karaoke.slice(4)}&\\3c${glowColor(s.karaoke.replace('&H00','').replace('&H','').replace('FFD700','#FFD700').replace('00FFFF','#00FFFF').replace('FF4500','#FF4500').replace('D4AF37','#D4AF37'))}&\\bord4\\shad2}${wordText}{\\r}`;
+            // Активное слово — цвет highlight, жирный, мягкая цветная тень
+            return `{\\c&H${s.karaoke.slice(4)}&\\b1\\shad2\\4c${glowColor(s.karaoke.replace('&H00','').replace('&H','').replace('FFD700','#FFD700').replace('00FFFF','#00FFFF').replace('FF4500','#FF4500').replace('D4AF37','#D4AF37'))}&}${wordText}{\\r}`;
           } else {
-            // Остальные — белые
-            return `{\\b1\\c&HFFFFFF&\\3c&H000000&\\bord2\\shad2}${wordText}{\\r}`;
+            // Остальные — белый, жирный, лёгкая чёрная тень
+            return `{\\c&HFFFFFF&\\b1\\shad1\\4c&H000000&}${wordText}{\\r}`;
           }
         }).join(' ');
-        ass += `Dialogue: 0,${start},${end},Inactive,,0,0,0,,${phrase}\n`;
+        ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
       }
     } else {
       // Если нет words — вся фраза одним Dialogue, белым стилем
       const start = assTime(seg.start);
       const end = assTime(seg.end);
       const text = typeof seg.text === 'string' ? seg.text : '';
-      ass += `Dialogue: 0,${start},${end},Inactive,,0,0,0,,${text}\n`;
+      ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\c&HFFFFFF&\\b1\\shad1\\4c&H000000&}${text}{\\r}\n`;
     }
   });
   return ass;
