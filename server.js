@@ -125,12 +125,25 @@ function createASSContent(segments, videoWidth = 1920, videoHeight = 1080) {
     let style = 'Default';
     if (seg.style && seg.style.color && seg.style.color.toUpperCase() === '#FFD700') style = 'Highlight';
     if (seg.style && seg.style.glow) style = 'Neon';
-    // Karaoke-эффект (если есть)
-    let text = typeof seg.text === 'string' ? seg.text : '';
-    if (seg.karaoke) {
-      // Длительность в десятках миллисекунд
-      const kdur = Math.round((seg.end - seg.start) * 100);
-      text = `{\\k${kdur}}${text}`;
+
+    // Karaoke-эффект: если есть words, собираем строку с {\k}
+    let text = '';
+    if (Array.isArray(seg.words) && seg.words.length > 0) {
+      let karaokeParts = [];
+      for (let j = 0; j < seg.words.length; j++) {
+        const w = seg.words[j];
+        const wordText = typeof w.text === 'string' ? w.text : '';
+        // Длительность слова в десятках миллисекунд (ASS {\k})
+        let kdur = 10; // по умолчанию 0.1 сек
+        if (typeof w.start === 'number' && typeof w.end === 'number' && w.end > w.start) {
+          kdur = Math.round((w.end - w.start) * 100);
+        }
+        karaokeParts.push(`{\\k${kdur}}${wordText}`);
+      }
+      text = karaokeParts.join(' ');
+    } else {
+      // Обычный субтитр
+      text = typeof seg.text === 'string' ? seg.text : '';
     }
     // Fade (если есть)
     if (seg.style && seg.style.fade) {
@@ -272,9 +285,11 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
     // Создаем ASS файл
     const assContent = createASSContent(transcript);
     const assPath = path.join(TEMP_DIR, `${taskId}_subtitles.ass`);
-    // Логируем содержимое ASS-файла для диагностики
-    console.log('ASS content:\n', assContent.slice(0, 2000)); // первые 2000 символов
+    const assDebugPath = path.join(OUTPUT_DIR, `${taskId}_debug.ass`);
+    // Логируем путь к debug-файлу
+    console.log('ASS debug file saved to:', assDebugPath);
     await fs.writeFile(assPath, assContent, 'utf8');
+    await fs.writeFile(assDebugPath, assContent, 'utf8');
     
     task.progress = 40;
     task.status = 'processing';
