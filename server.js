@@ -92,77 +92,132 @@ function getFFmpegStyle(style) {
   return styles[style] || styles.modern;
 }
 
-// Генерация ASS-файла с поддержкой стилей, karaoke и glow/fade
-function createASSContent(segments, videoWidth = 1920, videoHeight = 1080) {
-  // Секция Script Info
+function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
+  // Цвета ASS: &HAABBGGRR (BBGGRR, AA — прозрачность)
+  // Преобразование hex цвета в ASS
+  function hexToAss(hex, alpha = '00') {
+    const c = hex.replace('#', '');
+    return `&H${alpha}${c.slice(4,6)}${c.slice(2,4)}${c.slice(0,2)}`;
+  }
+  // Маппинг стилей
+  const styles = {
+    modern: {
+      name: 'Modern',
+      font: 'Montserrat',
+      size: videoHeight > videoWidth ? 80 : 48,
+      primary: hexToAss('#FFFFFF'),
+      karaoke: hexToAss('#FFD700'),
+      outline: 2,
+      outlineColor: hexToAss('#000000'),
+      backColor: '&H64000000', // полупрозрачный чёрный
+      bold: -1,
+      shadow: 2,
+      alignment: 2,
+      marginV: 80,
+      italic: 0,
+      glow: 0
+    },
+    neon: {
+      name: 'Neon',
+      font: 'Montserrat',
+      size: videoHeight > videoWidth ? 80 : 48,
+      primary: hexToAss('#00FFFF'),
+      karaoke: hexToAss('#00FFFF'),
+      outline: 2,
+      outlineColor: hexToAss('#FF00FF'),
+      backColor: '&H60000000',
+      bold: -1,
+      shadow: 4,
+      alignment: 2,
+      marginV: 80,
+      italic: 0,
+      glow: 1
+    },
+    fire: {
+      name: 'Fire',
+      font: 'Montserrat',
+      size: videoHeight > videoWidth ? 80 : 48,
+      primary: hexToAss('#FF4500'),
+      karaoke: hexToAss('#FFD700'),
+      outline: 2,
+      outlineColor: hexToAss('#FFD700'),
+      backColor: '&H90002828', // rgba(40,0,0,0.9)
+      bold: -1,
+      shadow: 4,
+      alignment: 2,
+      marginV: 80,
+      italic: 0,
+      glow: 1
+    },
+    elegant: {
+      name: 'Elegant',
+      font: 'Georgia',
+      size: videoHeight > videoWidth ? 64 : 44,
+      primary: hexToAss('#F5F5DC'),
+      karaoke: hexToAss('#D4AF37'),
+      outline: 2,
+      outlineColor: hexToAss('#8B4513'),
+      backColor: '&H800A1414', // rgba(20,20,20,0.5)
+      bold: 0,
+      shadow: 1,
+      alignment: 2,
+      marginV: 80,
+      italic: 1,
+      glow: 0
+    }
+  };
+  return styles[style] || styles.modern;
+}
+
+function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
+  const s = getASSStyles(style, videoWidth, videoHeight);
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
     `PlayResX: ${videoWidth}\n` +
     `PlayResY: ${videoHeight}\n` +
     `ScaledBorderAndShadow: yes\n` +
     `\n`;
-
-  // Секция стилей (Montserrat, жирный, белый, тень, outline, glow)
   ass += `[V4+ Styles]\n`;
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
-  // Базовый стиль
-  ass += `Style: Default,Montserrat,48,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,1,2,60,60,60,1\n`;
-  // Жёлтый стиль для ключевых слов
-  ass += `Style: Highlight,Montserrat,48,&H0000D7FF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,1,2,60,60,60,1\n`;
-  // Glow стиль (neon)
-  ass += `Style: Neon,Montserrat,48,&H00FFFF00,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,4,2,60,60,60,1\n`;
+  ass += `Style: ${s.name},${s.font},${s.size},${s.primary},${s.karaoke},${s.outlineColor},${s.backColor},${s.bold},${s.italic},0,0,100,100,0,0,1,${s.outline},${s.shadow},${s.alignment},60,60,${s.marginV},1\n`;
   ass += `\n`;
-
-  // Секция событий
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
-
-  // Генерируем события для каждого сегмента
   segments.forEach((seg, i) => {
     const start = assTime(seg.start);
     const end = assTime(seg.end);
-    // Определяем стиль
-    let style = 'Default';
-    if (seg.style && seg.style.color && seg.style.color.toUpperCase() === '#FFD700') style = 'Highlight';
-    if (seg.style && seg.style.glow) style = 'Neon';
-
-    // Karaoke-эффект: если есть words, собираем строку с {\k}
     let text = '';
     if (Array.isArray(seg.words) && seg.words.length > 0) {
       let karaokeParts = [];
       for (let j = 0; j < seg.words.length; j++) {
         const w = seg.words[j];
         const wordText = typeof w.text === 'string' ? w.text : '';
-        // Длительность слова в десятках миллисекунд (ASS {\k})
-        let kdur = 10; // по умолчанию 0.1 сек
+        let kdur = 10;
         if (typeof w.start === 'number' && typeof w.end === 'number' && w.end > w.start) {
           kdur = Math.round((w.end - w.start) * 100);
         }
+        // Karaoke-цвет: активное слово выделять через {\c&H...&} если нужно
+        // Для простоты: все слова обычные, можно добавить выделение для активного (например, через SecondaryColour)
         karaokeParts.push(`{\\k${kdur}}${wordText}`);
       }
       text = karaokeParts.join(' ');
     } else {
-      // Обычный субтитр
       text = typeof seg.text === 'string' ? seg.text : '';
     }
-    // Fade (если есть)
-    if (seg.style && seg.style.fade) {
-      text = `{\\fad(200,200)}${text}`;
-    }
-    // Жирность, цвет, underline, italic (ASS inline-теги)
+    // Fade-in/fade-out
+    text = `{\\fad(200,200)}${text}`;
     let inline = '';
     if (seg.style) {
       if (seg.style.fontWeight && String(seg.style.fontWeight) === '800') inline += '\\b1';
       if (seg.style.italic) inline += '\\i1';
       if (seg.style.underline) inline += '\\u1';
-      if (seg.style.color && seg.style.color !== '#FFFFFF' && style === 'Default') {
-        // Кастомный цвет
-        inline += `\\c&H${hexToAss(seg.style.color)}&`;
+      if (seg.style.color && seg.style.color !== '#FFFFFF') {
+        inline += `\\c&H${hexToAss(seg.style.color).slice(2)}&`;
       }
       if (seg.style.shadow !== undefined) inline += `\\shad${seg.style.shadow ? 1 : 0}`;
     }
     if (inline) text = `{${inline}}${text}`;
-    ass += `Dialogue: 0,${start},${end},${style},,0,0,0,,${text}\n`;
+    ass += `Dialogue: 0,${start},${end},${s.name},,0,0,0,,${text}\n`;
   });
   return ass;
 }
@@ -283,7 +338,7 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
     console.log(`📝 Creating ASS file for task ${taskId}`);
     
     // Создаем ASS файл
-    const assContent = createASSContent(transcript);
+    const assContent = createASSContent(transcript, style);
     const assPath = path.join(TEMP_DIR, `${taskId}_subtitles.ass`);
     const assDebugPath = path.join(OUTPUT_DIR, `${taskId}_debug.ass`);
     // Логируем путь к debug-файлу
