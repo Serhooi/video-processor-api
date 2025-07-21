@@ -171,6 +171,7 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
 
 function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
   const s = getASSStyles(style, videoWidth, videoHeight);
+  // Добавляем отдельный стиль для активного слова
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
     `PlayResX: ${videoWidth}\n` +
@@ -179,43 +180,29 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     `\n`;
   ass += `[V4+ Styles]\n`;
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
-  ass += `Style: ${s.name},${s.font},${s.size},${s.primary},${s.karaoke},${s.outlineColor},${s.backColor},${s.bold},${s.italic},0,0,100,100,0,0,1,${s.outline},${s.shadow},${s.alignment},60,60,${s.marginV},1\n`;
+  ass += `Style: Active,${s.font},${s.size},${s.karaoke},${s.karaoke},${s.karaoke},${s.backColor},-1,0,0,0,100,100,0,0,1,4,2,2,60,60,${s.marginV},1\n`;
+  ass += `Style: Inactive,${s.font},${s.size},${s.primary},${s.primary},${s.outlineColor},${s.backColor},-1,0,0,0,100,100,0,0,1,2,2,2,60,60,${s.marginV},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
   segments.forEach((seg, i) => {
-    const start = assTime(seg.start);
-    const end = assTime(seg.end);
-    let text = '';
+    // Если есть words — каждое слово отдельный Dialogue
     if (Array.isArray(seg.words) && seg.words.length > 0) {
-      let karaokeParts = [];
       for (let j = 0; j < seg.words.length; j++) {
         const w = seg.words[j];
         const wordText = typeof w.text === 'string' ? w.text : '';
-        let kdur = 10;
-        if (typeof w.start === 'number' && typeof w.end === 'number' && w.end > w.start) {
-          kdur = Math.round((w.end - w.start) * 100);
-        }
-        // Стандартный karaoke: только {\k}, SecondaryColour и glow через стиль
-        karaokeParts.push(`{\\k${kdur}}${wordText}`);
+        const start = assTime(w.start);
+        const end = assTime(w.end);
+        // Активное слово — стиль Active, остальные — Inactive
+        ass += `Dialogue: 0,${start},${end},Active,,0,0,0,,${wordText}\n`;
       }
-      text = karaokeParts.join(' ');
     } else {
-      text = typeof seg.text === 'string' ? seg.text : '';
+      // Если нет words — вся фраза одним Dialogue, белым стилем
+      const start = assTime(seg.start);
+      const end = assTime(seg.end);
+      const text = typeof seg.text === 'string' ? seg.text : '';
+      ass += `Dialogue: 0,${start},${end},Inactive,,0,0,0,,${text}\n`;
     }
-    // Без fade
-    let inline = '';
-    if (seg.style) {
-      if (seg.style.fontWeight && String(seg.style.fontWeight) === '800') inline += '\\b1';
-      if (seg.style.italic) inline += '\\i1';
-      if (seg.style.underline) inline += '\\u1';
-      if (seg.style.color && seg.style.color !== '#FFFFFF') {
-        inline += `\\c&H${hexToAss(seg.style.color).slice(2)}&`;
-      }
-      if (seg.style.shadow !== undefined) inline += `\\shad${seg.style.shadow ? 1 : 0}`;
-    }
-    if (inline) text = `{${inline}}${text}`;
-    ass += `Dialogue: 0,${start},${end},${s.name},,0,0,0,,${text}\n`;
   });
   return ass;
 }
