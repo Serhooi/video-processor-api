@@ -171,7 +171,6 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
 
 function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
   const s = getASSStyles(style, videoWidth, videoHeight);
-  // Добавляем отдельный стиль для активного слова
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
     `PlayResX: ${videoWidth}\n` +
@@ -186,15 +185,23 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
   segments.forEach((seg, i) => {
-    // Если есть words — каждое слово отдельный Dialogue
     if (Array.isArray(seg.words) && seg.words.length > 0) {
       for (let j = 0; j < seg.words.length; j++) {
         const w = seg.words[j];
-        const wordText = typeof w.text === 'string' ? w.text : '';
         const start = assTime(w.start);
         const end = assTime(w.end);
-        // Активное слово — стиль Active, остальные — Inactive
-        ass += `Dialogue: 0,${start},${end},Active,,0,0,0,,${wordText}\n`;
+        // Собираем всю фразу, выделяя только текущее слово
+        let phrase = seg.words.map((word, idx) => {
+          const wordText = typeof word.text === 'string' ? word.text : '';
+          if (idx === j) {
+            // Активное слово — цвет стиля + glow
+            return `{\\b1}{{\\c&H${s.karaoke.slice(4)}&\\3c&H${s.karaoke.slice(4)}&\\bord4\\shad2}}${wordText}{\\r}`;
+          } else {
+            // Остальные — белые
+            return `{\\b1}{{\\c&HFFFFFF&\\3c&H000000&\\bord2\\shad2}}${wordText}{\\r}`;
+          }
+        }).join(' ');
+        ass += `Dialogue: 0,${start},${end},Inactive,,0,0,0,,${phrase}\n`;
       }
     } else {
       // Если нет words — вся фраза одним Dialogue, белым стилем
