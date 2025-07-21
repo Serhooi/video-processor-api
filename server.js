@@ -126,11 +126,11 @@ function createASSContent(segments, videoWidth = 1920, videoHeight = 1080) {
     if (seg.style && seg.style.color && seg.style.color.toUpperCase() === '#FFD700') style = 'Highlight';
     if (seg.style && seg.style.glow) style = 'Neon';
     // Karaoke-эффект (если есть)
-    let text = seg.text;
+    let text = typeof seg.text === 'string' ? seg.text : '';
     if (seg.karaoke) {
       // Длительность в десятках миллисекунд
       const kdur = Math.round((seg.end - seg.start) * 100);
-      text = `{\\k${kdur}}${seg.text}`;
+      text = `{\\k${kdur}}${text}`;
     }
     // Fade (если есть)
     if (seg.style && seg.style.fade) {
@@ -278,6 +278,7 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
     task.status = 'processing';
     
     console.log(`🎬 Processing video with FFmpeg for task ${taskId}`);
+    console.log('transcript:', transcript);
     
     // Обрабатываем видео с FFmpeg
     const outputPath = path.join(OUTPUT_DIR, `${taskId}_output.mp4`);
