@@ -179,21 +179,21 @@ function splitPhraseToLines(words, maxWordsPerLine = 5) {
 // Функция для заполнения пауз между сегментами
 function fillGaps(segments, maxGap = 2.0) {
   if (!segments || segments.length === 0) return segments;
-  
+
   const result = [];
-  
+
   for (let i = 0; i < segments.length; i++) {
     const currentSeg = segments[i];
     const nextSeg = segments[i + 1];
-    
+
     if (Array.isArray(currentSeg.words) && currentSeg.words.length > 0) {
       const segmentEnd = currentSeg.words[currentSeg.words.length - 1].end;
-      
+
       // Если есть следующий сегмент и пауза не слишком большая
       if (nextSeg && Array.isArray(nextSeg.words) && nextSeg.words.length > 0) {
         const nextSegmentStart = nextSeg.words[0].start;
         const gap = nextSegmentStart - segmentEnd;
-        
+
         if (gap > 0.1 && gap <= maxGap) {
           // Продлеваем последнее слово до начала следующего сегмента
           const extendedSeg = {
@@ -217,7 +217,7 @@ function fillGaps(segments, maxGap = 2.0) {
       result.push(currentSeg);
     }
   }
-  
+
   return result;
 }
 
@@ -250,29 +250,47 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
-  // Заполняем паузы между сегментами
-  const processedSegments = fillGaps(segments);
-  
-  processedSegments.forEach((seg, i) => {
+  // Временно отключаем заполнение пауз для отладки
+  // const processedSegments = fillGaps(segments);
+
+  segments.forEach((seg, i) => {
     if (Array.isArray(seg.words) && seg.words.length > 0) {
       // Логируем для отладки
       console.log(`Segment ${i}: ${seg.words.length} words:`, seg.words.map(w => w.word || w.text).join(' '));
 
-      // Ограничиваем количество слов до 10 (2 строки по 5 слов)
+      // Фильтруем пустые слова и ограничиваем количество
+      const validWords = seg.words.filter(word => {
+        const wordText = word.text || word.word || word.Text || word.Word || '';
+        return wordText.trim() !== '' && typeof word.start === 'number' && typeof word.end === 'number';
+      });
+      
       const maxWords = 10;
-      const wordsToProcess = seg.words.length > maxWords ? seg.words.slice(0, maxWords) : seg.words;
+      const wordsToProcess = validWords.length > maxWords ? validWords.slice(0, maxWords) : validWords;
 
       // Для каждого слова создаем отдельный диалог где только оно активное
       for (let j = 0; j < wordsToProcess.length; j++) {
         const w = wordsToProcess[j];
+        
+        // Проверяем временные метки
+        if (typeof w.start !== 'number' || typeof w.end !== 'number') {
+          console.log('⚠️ Invalid timestamps:', w);
+          continue;
+        }
+        
         const start = assTime(w.start);
         const end = assTime(w.end);
 
         const lines = splitPhraseToLines(wordsToProcess, 5);
         let phrase = lines.map(lineWords =>
           lineWords.map((word) => {
-            const wordText = typeof word.text === 'string' ? word.text : (typeof word.word === 'string' ? word.word : '');
+            // Улучшенная обработка текста слова
+            const wordText = word.text || word.word || word.Text || word.Word || '';
             const globalIdx = wordsToProcess.indexOf(word);
+            
+            // Отладка для проблемных слов
+            if (!wordText) {
+              console.log('⚠️ Empty word:', word);
+            }
 
             if (globalIdx === j) {
               // Активное слово: цветное и увеличенное
@@ -281,10 +299,12 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
               // Обычное слово: белое обычного размера
               return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}}${wordText}{\\r}`;
             }
-          }).join(' ')
-        ).join('\\N');
+          }).filter(text => text.trim() !== '').join(' ')
+        ).filter(line => line.trim() !== '').join('\\N');
 
-        ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
+        if (phrase.trim()) {
+          ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
+        }
       }
     } else {
       const start = assTime(seg.start);
