@@ -210,7 +210,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
       // Ограничиваем количество слов до 10 (2 строки по 5 слов)
       const maxWords = 10;
       const wordsToProcess = seg.words.length > maxWords ? seg.words.slice(0, maxWords) : seg.words;
-      
+
       // Для каждого слова — отдельный Dialogue, где только оно подсвечено
       for (let j = 0; j < wordsToProcess.length; j++) {
         const w = wordsToProcess[j];
