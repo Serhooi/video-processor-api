@@ -176,6 +176,51 @@ function splitPhraseToLines(words, maxWordsPerLine = 5) {
   return [wordsToUse.slice(0, midPoint), wordsToUse.slice(midPoint)];
 }
 
+// Функция для заполнения пауз между сегментами
+function fillGaps(segments, maxGap = 2.0) {
+  if (!segments || segments.length === 0) return segments;
+  
+  const result = [];
+  
+  for (let i = 0; i < segments.length; i++) {
+    const currentSeg = segments[i];
+    const nextSeg = segments[i + 1];
+    
+    if (Array.isArray(currentSeg.words) && currentSeg.words.length > 0) {
+      const segmentEnd = currentSeg.words[currentSeg.words.length - 1].end;
+      
+      // Если есть следующий сегмент и пауза не слишком большая
+      if (nextSeg && Array.isArray(nextSeg.words) && nextSeg.words.length > 0) {
+        const nextSegmentStart = nextSeg.words[0].start;
+        const gap = nextSegmentStart - segmentEnd;
+        
+        if (gap > 0.1 && gap <= maxGap) {
+          // Продлеваем последнее слово до начала следующего сегмента
+          const extendedSeg = {
+            ...currentSeg,
+            words: currentSeg.words.map((word, idx) => {
+              if (idx === currentSeg.words.length - 1) {
+                return { ...word, end: nextSegmentStart - 0.1 }; // Оставляем небольшой зазор
+              }
+              return word;
+            })
+          };
+          result.push(extendedSeg);
+          console.log(`📏 Extended segment ${i}: gap ${gap.toFixed(2)}s filled`);
+        } else {
+          result.push(currentSeg);
+        }
+      } else {
+        result.push(currentSeg);
+      }
+    } else {
+      result.push(currentSeg);
+    }
+  }
+  
+  return result;
+}
+
 function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
   style = (typeof style === 'string' ? style.toLowerCase().trim() : 'modern');
 
@@ -205,7 +250,10 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
-  segments.forEach((seg, i) => {
+  // Заполняем паузы между сегментами
+  const processedSegments = fillGaps(segments);
+  
+  processedSegments.forEach((seg, i) => {
     if (Array.isArray(seg.words) && seg.words.length > 0) {
       // Логируем для отладки
       console.log(`Segment ${i}: ${seg.words.length} words:`, seg.words.map(w => w.word || w.text).join(' '));
@@ -219,13 +267,13 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         const w = wordsToProcess[j];
         const start = assTime(w.start);
         const end = assTime(w.end);
-        
+
         const lines = splitPhraseToLines(wordsToProcess, 5);
         let phrase = lines.map(lineWords =>
           lineWords.map((word) => {
             const wordText = typeof word.text === 'string' ? word.text : (typeof word.word === 'string' ? word.word : '');
             const globalIdx = wordsToProcess.indexOf(word);
-            
+
             if (globalIdx === j) {
               // Активное слово: цветное и увеличенное
               return `{\\c${activeColor}\\b1\\shad3\\4c${blackShadow}\\fs${activeFontSize}}${wordText}{\\r}`;
@@ -235,7 +283,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
             }
           }).join(' ')
         ).join('\\N');
-        
+
         ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
       }
     } else {
