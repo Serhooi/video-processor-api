@@ -220,9 +220,9 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         lineWords.map((word) => {
           const wordText = typeof word.text === 'string' ? word.text : (typeof word.word === 'string' ? word.word : '');
           const wordDuration = Math.round((word.end - word.start) * 100); // длительность в сантисекундах
-          
+
           // Караоке тег: слово белое, потом становится цветным и увеличенным
-          return `{\\k${wordDuration}\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}}${wordText}{\\c${activeColor}\\b1\\shad3\\4c${blackShadow}\\fs${activeFontSize}}`;
+          return `{\\k${wordDuration}\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}}${wordText} {\\c${activeColor}\\b1\\shad3\\4c${blackShadow}\\fs${activeFontSize}}`;
         }).join('')
       ).join('\\N');
 
