@@ -5,6 +5,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs-extra');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const { exec } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -409,6 +410,11 @@ setInterval(() => {
     }
   }
 }, 60 * 60 * 1000); // Каждый час
+
+exec('ffmpeg -version', (err, stdout, stderr) => {
+  if (stdout) console.log('FFmpeg version:', stdout);
+  if (stderr) console.log('FFmpeg stderr:', stderr);
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 Video processor API running on port ${PORT}`);
