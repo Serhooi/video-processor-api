@@ -189,8 +189,8 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         let phrase = seg.words.map((word, idx) => {
           const wordText = typeof word.text === 'string' ? word.text : '';
           if (idx === j) {
-            // Активное слово — цвет стиля, жирный, тень такого же цвета с alpha=80, \shad6
-            return `{\\c${highlightColor}\\b1\\shad6\\4c${highlightShadow}}${wordText}{\\r}`;
+            // Активное слово — цвет стиля, жирный, тень такого же цвета с alpha=80, \shad10
+            return `{\\c${highlightColor}\\b1\\shad10\\4c${highlightShadow}}${wordText}{\\r}`;
           } else {
             // Остальные — белый, жирный, чёрная тень без прозрачности, \shad3
             return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}}${wordText}{\\r}`;
