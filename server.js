@@ -162,12 +162,11 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
 }
 
 function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
-  const s = getASSStyles(style, videoWidth, videoHeight);
-  // Цвета для glow/shadow
-  const highlightColor = s.karaoke; // основной цвет стиля
-  const highlightShadow = highlightColor.replace('&H00', '&H80'); // alpha=80 (50%)
-  const whiteColor = s.primary;
-  const blackShadow = s.outlineColor; // чёрный, без прозрачности
+  // Жёстко задаём цвета и shadow для теста (best practice)
+  const highlightColor = '&HFFD700&'; // ярко-жёлтый
+  const highlightShadow = '&H80FFD700&'; // жёлтый, 50% прозрачности
+  const whiteColor = '&HFFFFFF&';
+  const blackShadow = '&H000000&';
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
     `PlayResX: ${videoWidth}\n` +
@@ -176,7 +175,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     `\n`;
   ass += `[V4+ Styles]\n`;
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
-  ass += `Style: Default,${s.font},${s.size},${whiteColor},${whiteColor},${s.outlineColor},${s.backColor},-1,0,0,0,100,100,0,0,1,0,0,2,60,60,${s.marginV},1\n`;
+  ass += `Style: Default,Arial,${Math.round(videoHeight/13)},${whiteColor},${whiteColor},${blackShadow},${blackShadow},0,0,0,0,100,100,0,0,1,0,0,2,60,60,${Math.round(videoHeight/16)},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
@@ -190,11 +189,11 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         let phrase = seg.words.map((word, idx) => {
           const wordText = typeof word.text === 'string' ? word.text : '';
           if (idx === j) {
-            // Активное слово — цвет стиля, жирный, тень такого же цвета с alpha=80, \\shad10
-            return `{\\c${highlightColor}\\b1\\shad10\\4c${highlightShadow}}${wordText}{\\r}`;
+            // Активное слово — жёлтый, жирный, тень жёлтая с alpha=80, \shad10
+            return `{\\c&HFFD700&\\b1\\shad10\\4c&H80FFD700&}${wordText}{\\r}`;
           } else {
-            // Остальные — белый, жирный, чёрная тень без прозрачности, \\shad3
-            return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}}${wordText}{\\r}`;
+            // Остальные — белый, жирный, чёрная тень, \shad3
+            return `{\\c&HFFFFFF&\\b1\\shad3\\4c&H000000&}${wordText}{\\r}`;
           }
         }).join(' ');
         ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
@@ -204,7 +203,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
       const start = assTime(seg.start);
       const end = assTime(seg.end);
       const text = typeof seg.text === 'string' ? seg.text : '';
-      ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}}${text}{\\r}\n`;
+      ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\c&HFFFFFF&\\b1\\shad3\\4c&H000000&}${text}{\\r}\n`;
     }
   });
   return ass;
