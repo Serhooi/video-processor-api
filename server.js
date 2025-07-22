@@ -162,11 +162,11 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
 
 function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
   const s = getASSStyles(style, videoWidth, videoHeight);
-  // Цвета для glow/shadow с прозрачностью 50%
+  // Цвета для glow/shadow
   const highlightColor = s.karaoke; // основной цвет стиля
   const highlightShadow = highlightColor.replace('&H00', '&H80'); // alpha=80 (50%)
   const whiteColor = s.primary;
-  const blackShadow = s.outlineColor.replace('&H00', '&H80'); // чёрный с alpha=80
+  const blackShadow = s.outlineColor; // чёрный, без прозрачности
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
     `PlayResX: ${videoWidth}\n` +
@@ -189,11 +189,11 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         let phrase = seg.words.map((word, idx) => {
           const wordText = typeof word.text === 'string' ? word.text : '';
           if (idx === j) {
-            // Активное слово — цвет стиля, жирный, мягкая тень (glow) с alpha=80, \shad6
+            // Активное слово — цвет стиля, жирный, тень такого же цвета с alpha=80, \shad6
             return `{\\c${highlightColor}\\b1\\shad6\\4c${highlightShadow}}${wordText}{\\r}`;
           } else {
-            // Остальные — белый, жирный, чёрная тень с alpha=80, \shad6
-            return `{\\c${whiteColor}\\b1\\shad6\\4c${blackShadow}}${wordText}{\\r}`;
+            // Остальные — белый, жирный, чёрная тень без прозрачности, \shad3
+            return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}}${wordText}{\\r}`;
           }
         }).join(' ');
         ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
@@ -203,7 +203,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
       const start = assTime(seg.start);
       const end = assTime(seg.end);
       const text = typeof seg.text === 'string' ? seg.text : '';
-      ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\c${whiteColor}\\b1\\shad6\\4c${blackShadow}}${text}{\\r}\n`;
+      ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}}${text}{\\r}\n`;
     }
   });
   return ass;
