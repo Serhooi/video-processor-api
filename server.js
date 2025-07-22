@@ -214,23 +214,30 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
       const maxWords = 10;
       const wordsToProcess = seg.words.length > maxWords ? seg.words.slice(0, maxWords) : seg.words;
 
-      // Создаем один диалог с караоке эффектом
-      const segmentStart = assTime(wordsToProcess[0].start);
-      const segmentEnd = assTime(wordsToProcess[wordsToProcess.length - 1].end);
-
-      const lines = splitPhraseToLines(wordsToProcess, 5);
-      let karaokePhrase = lines.map(lineWords =>
-        lineWords.map((word) => {
-          const wordText = typeof word.text === 'string' ? word.text : (typeof word.word === 'string' ? word.word : '');
-          const wordDuration = Math.round((word.end - word.start) * 100); // длительность в сантисекундах
-
-          // Караоке с увеличением размера активного слова
-          return `{\\k${wordDuration}\\fs${baseFontSize}}${wordText} {\\fs${activeFontSize}}`;
-        }).join('')
-      ).join('\\N');
-
-      // Один диалог с караоке эффектом
-      ass += `Dialogue: 0,${segmentStart},${segmentEnd},Default,,0,0,0,karaoke,${karaokePhrase}\n`;
+      // Для каждого слова создаем отдельный диалог где только оно активное
+      for (let j = 0; j < wordsToProcess.length; j++) {
+        const w = wordsToProcess[j];
+        const start = assTime(w.start);
+        const end = assTime(w.end);
+        
+        const lines = splitPhraseToLines(wordsToProcess, 5);
+        let phrase = lines.map(lineWords =>
+          lineWords.map((word) => {
+            const wordText = typeof word.text === 'string' ? word.text : (typeof word.word === 'string' ? word.word : '');
+            const globalIdx = wordsToProcess.indexOf(word);
+            
+            if (globalIdx === j) {
+              // Активное слово: цветное и увеличенное
+              return `{\\c${activeColor}\\b1\\shad3\\4c${blackShadow}\\fs${activeFontSize}}${wordText}{\\r}`;
+            } else {
+              // Обычное слово: белое обычного размера
+              return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}}${wordText}{\\r}`;
+            }
+          }).join(' ')
+        ).join('\\N');
+        
+        ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
+      }
     } else {
       const start = assTime(seg.start);
       const end = assTime(seg.end);
