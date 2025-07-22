@@ -162,7 +162,7 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
 }
 
 function splitPhraseToLines(words, maxWordsPerLine = 6) {
-  // Разбивает массив слов на максимум две строки (всё, что не влезло — во вторую)
+  // Максимум две строки: всё, что не влезло — во вторую
   if (words.length <= maxWordsPerLine) return [words];
   return [words.slice(0, maxWordsPerLine), words.slice(maxWordsPerLine)];
 }
@@ -176,10 +176,10 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     elegant:{ active: '&HD4AF37&', shadow: '&H80D4AF37&' }
   };
   const activeColor = styleColors[style] ? styleColors[style].active : styleColors.modern.active;
-  const activeShadow = styleColors[style] ? styleColors[style].shadow : styleColors[style].shadow;
+  const activeShadow = styleColors[style] ? styleColors[style].shadow : styleColors.modern.shadow;
   const whiteColor = '&HFFFFFF&';
   const blackShadow = '&H000000&';
-  const baseFontSize = Math.round(videoHeight/20);
+  const baseFontSize = Math.round(videoHeight/22);
   const activeFontSize = baseFontSize + 2;
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
@@ -195,6 +195,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
   segments.forEach((seg, i) => {
     if (Array.isArray(seg.words) && seg.words.length > 0) {
+      // Для каждого слова — отдельный Dialogue, где только оно подсвечено
       for (let j = 0; j < seg.words.length; j++) {
         const w = seg.words[j];
         const start = assTime(w.start);
