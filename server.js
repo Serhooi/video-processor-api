@@ -22,7 +22,7 @@ fs.ensureDirSync(TEMP_DIR);
 fs.ensureDirSync(OUTPUT_DIR);
 
 // Настройка multer для загрузки файлов
-const upload = multer({ 
+const upload = multer({
   dest: TEMP_DIR,
   limits: { fileSize: 100 * 1024 * 1024 } // 100MB
 });
@@ -34,20 +34,20 @@ const tasks = new Map();
 function createSRTContent(transcript, startOffset = 0) {
   let srtContent = '';
   let segmentIndex = 1;
-  
+
   // Группируем слова в сегменты (2-3 слова)
   const segments = [];
   let currentSegment = [];
-  
+
   for (let i = 0; i < transcript.length; i++) {
     const word = transcript[i];
     currentSegment.push(word);
-    
+
     // Создаем сегмент каждые 2-3 слова или при паузах
-    if (currentSegment.length >= 3 || 
-        (i < transcript.length - 1 && transcript[i + 1].start - word.end > 0.5) ||
-        i === transcript.length - 1) {
-      
+    if (currentSegment.length >= 3 ||
+      (i < transcript.length - 1 && transcript[i + 1].start - word.end > 0.5) ||
+      i === transcript.length - 1) {
+
       segments.push({
         start: currentSegment[0].start - startOffset,
         end: currentSegment[currentSegment.length - 1].end - startOffset,
@@ -56,18 +56,18 @@ function createSRTContent(transcript, startOffset = 0) {
       currentSegment = [];
     }
   }
-  
+
   // Конвертируем в SRT формат
   segments.forEach(segment => {
     const startTime = formatSRTTime(segment.start);
     const endTime = formatSRTTime(segment.end);
-    
+
     srtContent += `${segmentIndex}\n`;
     srtContent += `${startTime} --> ${endTime}\n`;
     srtContent += `${segment.text}\n\n`;
     segmentIndex++;
   });
-  
+
   return srtContent;
 }
 
@@ -89,7 +89,7 @@ function getFFmpegStyle(style) {
     fire: "FontName=Arial,FontSize=24,PrimaryColour=&H0045FF&,OutlineColour=&H00D7FF&,Outline=2,Shadow=1",
     elegant: "FontName=Georgia,FontSize=22,PrimaryColour=&HF5F5F5&,OutlineColour=&H333333&,Outline=1,Shadow=1"
   };
-  
+
   return styles[style] || styles.modern;
 }
 
@@ -110,7 +110,7 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
       font: 'Montserrat Bold',
       size: Math.round(videoHeight / 13),
       primary: hexToAss('#FFFFFF'),
-      karaoke: hexToAss('#FFD700'), // Ярко-жёлтый
+      karaoke: hexToAss('#FFD700'), // Желтый для модерн стиля
       outlineColor: hexToAss('#000000'),
       backColor: hexToAss('#000000', 'FF'),
       marginV: Math.round(videoHeight / 16),
@@ -120,7 +120,7 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
       font: 'Montserrat Bold',
       size: Math.round(videoHeight / 13),
       primary: hexToAss('#FFFFFF'),
-      karaoke: hexToAss('#00FFFF'), // Голубой
+      karaoke: hexToAss('#0000FF'), // Синий для неон стиля
       outlineColor: hexToAss('#000000'),
       backColor: hexToAss('#000000', 'FF'),
       marginV: Math.round(videoHeight / 16),
@@ -161,26 +161,38 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
   return styles[style] || styles.modern;
 }
 
-function splitPhraseToLines(words, maxWordsPerLine = 6) {
-  // Максимум две строки: всё, что не влезло — во вторую
-  if (words.length <= maxWordsPerLine) return [words];
-  return [words.slice(0, maxWordsPerLine), words.slice(maxWordsPerLine)];
+function splitPhraseToLines(words, maxWordsPerLine = 4) {
+  // Строго максимум две строки, ограничиваем количество слов
+  if (words.length <= maxWordsPerLine) {
+    return [words];
+  }
+
+  // Если слов больше чем maxWordsPerLine*2, обрезаем до максимума
+  const maxTotalWords = maxWordsPerLine * 2;
+  const wordsToUse = words.length > maxTotalWords ? words.slice(0, maxTotalWords) : words;
+
+  // Делим на две строки максимально равномерно
+  const midPoint = Math.ceil(wordsToUse.length / 2);
+  return [wordsToUse.slice(0, midPoint), wordsToUse.slice(midPoint)];
 }
 
 function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
   style = (typeof style === 'string' ? style.toLowerCase().trim() : 'modern');
+
+  // Цвета для активных слов по стилям (ASS формат: &HBBGGRR&)
   const styleColors = {
-    modern: { active: '&HFFD700&', shadow: '&H80FFD700&' },
-    neon:   { active: '&H00FFFF&', shadow: '&H8000FFFF&' },
-    fire:   { active: '&HFF4500&', shadow: '&H80FF4500&' },
-    elegant:{ active: '&HD4AF37&', shadow: '&H80D4AF37&' }
+    modern: { active: '&H00D7FF&', shadow: '&H8000D7FF&' },  // Желтый (FFD700 -> 00D7FF)
+    neon: { active: '&HFFFF00&', shadow: '&H80FFFF00&' },  // Синий (0000FF -> FFFF00)
+    fire: { active: '&H0045FF&', shadow: '&H800045FF&' },  // Красно-оранжевый
+    elegant: { active: '&H37AF37&', shadow: '&H8037AF37&' }   // Золотой
   };
+
   const activeColor = styleColors[style] ? styleColors[style].active : styleColors.modern.active;
   const activeShadow = styleColors[style] ? styleColors[style].shadow : styleColors.modern.shadow;
   const whiteColor = '&HFFFFFF&';
   const blackShadow = '&H000000&';
-  const baseFontSize = Math.round(videoHeight/22);
-  const activeFontSize = baseFontSize + 2;
+  const baseFontSize = Math.round(videoHeight / 20);
+  const activeFontSize = Math.round(baseFontSize * 1.4); // Увеличиваем на 40%
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
     `PlayResX: ${videoWidth}\n` +
@@ -189,7 +201,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     `\n`;
   ass += `[V4+ Styles]\n`;
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
-  ass += `Style: Default,Arial,${baseFontSize},${whiteColor},${whiteColor},${blackShadow},${blackShadow},0,0,0,0,100,100,0,0,1,0,0,2,60,60,${Math.round(videoHeight/16)},1\n`;
+  ass += `Style: Default,Arial,${baseFontSize},${whiteColor},${whiteColor},${blackShadow},${blackShadow},0,0,0,0,100,100,0,0,1,0,0,2,60,60,${Math.round(videoHeight / 16)},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
@@ -200,16 +212,16 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         const w = seg.words[j];
         const start = assTime(w.start);
         const end = assTime(w.end);
-        const lines = splitPhraseToLines(seg.words, 6);
+        const lines = splitPhraseToLines(seg.words, 4);
         let lineTexts = lines.map(lineWords =>
           lineWords.map((word, idx) => {
-            const wordText = typeof word.text === 'string' ? word.text : '';
+            const wordText = typeof word.text === 'string' ? word.text : (typeof word.word === 'string' ? word.word : '');
             const globalIdx = seg.words.indexOf(word);
             if (globalIdx === j) {
-              // Активное слово: цвет по стилю, жирный, тень по стилю, увеличен на 2px
-              return `{\\c${activeColor}\\b1\\shad10\\4c${activeShadow}\\fs${activeFontSize}}${wordText}{\\r}`;
+              // Активное слово: цвет по стилю, жирный, увеличенный размер, яркая тень
+              return `{\\c${activeColor}\\b1\\shad8\\4c${activeShadow}\\fs${activeFontSize}\\fscx110\\fscy110}${wordText}{\\r}`;
             } else {
-              // Обычное слово
+              // Обычное слово: белый, стандартный размер
               return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}}${wordText}{\\r}`;
             }
           }).join(' ')
@@ -239,7 +251,7 @@ function assTime(sec) {
 function hexToAss(hex) {
   // #RRGGBB -> BBGGRR
   const c = hex.replace('#', '');
-  return c.length === 6 ? c.slice(4,6) + c.slice(2,4) + c.slice(0,2) : 'FFFFFF';
+  return c.length === 6 ? c.slice(4, 6) + c.slice(2, 4) + c.slice(0, 2) : 'FFFFFF';
 }
 
 // API Routes
@@ -252,13 +264,13 @@ app.get('/health', (req, res) => {
 // Обработка видео с субтитрами
 app.post('/api/burn-subtitles', async (req, res) => {
   const taskId = uuidv4();
-  
+
   try {
     const { videoUrl, transcript, style = 'modern', title = 'video' } = req.body;
-    
+
     if (!videoUrl || !transcript || !Array.isArray(transcript)) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: videoUrl, transcript' 
+      return res.status(400).json({
+        error: 'Missing required fields: videoUrl, transcript'
       });
     }
 
@@ -291,11 +303,11 @@ app.post('/api/burn-subtitles', async (req, res) => {
 app.get('/api/task/:taskId', (req, res) => {
   const { taskId } = req.params;
   const task = tasks.get(taskId);
-  
+
   if (!task) {
     return res.status(404).json({ error: 'Task not found' });
   }
-  
+
   res.json(task);
 });
 
@@ -303,45 +315,45 @@ app.get('/api/task/:taskId', (req, res) => {
 app.get('/api/download/:taskId', (req, res) => {
   const { taskId } = req.params;
   const task = tasks.get(taskId);
-  
+
   if (!task || task.status !== 'completed' || !task.outputPath) {
     return res.status(404).json({ error: 'Video not ready or not found' });
   }
-  
+
   if (!fs.existsSync(task.outputPath)) {
     return res.status(404).json({ error: 'Video file not found' });
   }
-  
+
   res.download(task.outputPath, task.filename || 'video_with_subtitles.mp4');
 });
 
 // Основная функция обработки видео
 async function processVideo(taskId, videoUrl, transcript, style, title) {
   const task = tasks.get(taskId);
-  
+
   try {
     // Обновляем прогресс
     task.progress = 10;
     task.status = 'downloading';
-    
+
     console.log(`📥 Downloading video for task ${taskId}`);
-    
+
     // Скачиваем видео
     const videoPath = path.join(TEMP_DIR, `${taskId}_input.mp4`);
     const response = await fetch(videoUrl);
-    
+
     if (!response.ok) {
       throw new Error(`Failed to download video: ${response.statusText}`);
     }
-    
+
     const buffer = await response.arrayBuffer();
     await fs.writeFile(videoPath, Buffer.from(buffer));
-    
+
     task.progress = 30;
     task.status = 'preparing';
-    
+
     console.log(`📝 Creating ASS file for task ${taskId}`);
-    
+
     // Создаем ASS файл
     const assContent = createASSContent(transcript, style);
     const assPath = path.join(TEMP_DIR, `${taskId}_subtitles.ass`);
@@ -350,13 +362,13 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
     console.log('ASS debug file saved to:', assDebugPath);
     await fs.writeFile(assPath, assContent, 'utf8');
     await fs.writeFile(assDebugPath, assContent, 'utf8');
-    
+
     task.progress = 40;
     task.status = 'processing';
-    
+
     console.log(`🎬 Processing video with FFmpeg for task ${taskId}`);
     console.log('transcript:', transcript);
-    
+
     // Обрабатываем видео с FFmpeg
     const outputPath = path.join(OUTPUT_DIR, `${taskId}_output.mp4`);
     await new Promise((resolve, reject) => {
@@ -387,22 +399,22 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
         })
         .run();
     });
-    
+
     // Завершаем задачу
     task.progress = 100;
     task.status = 'completed';
     task.outputPath = outputPath;
     task.filename = `${title.replace(/[^a-zA-Z0-9]/g, '_')}_with_subtitles.mp4`;
     task.completedAt = new Date();
-    
+
     console.log(`🎉 Task ${taskId} finished successfully`);
-    
+
     // Очищаем временные файлы
     setTimeout(() => {
       fs.remove(videoPath).catch(console.error);
       fs.remove(assPath).catch(console.error);
     }, 1000);
-    
+
   } catch (error) {
     console.error(`❌ Task ${taskId} failed:`, error);
     task.status = 'failed';
@@ -415,7 +427,7 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
 setInterval(() => {
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-  
+
   for (const [taskId, task] of tasks.entries()) {
     if (task.createdAt < oneHourAgo) {
       // Удаляем файл если есть
