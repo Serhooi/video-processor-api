@@ -161,17 +161,17 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
   return styles[style] || styles.modern;
 }
 
-function splitPhraseToLines(words, maxWordsPerLine = 4) {
-  // Строго максимум две строки, ограничиваем количество слов
+function splitPhraseToLines(words, maxWordsPerLine = 5) {
+  // Строго максимум две строки
   if (words.length <= maxWordsPerLine) {
     return [words];
   }
 
-  // Если слов больше чем maxWordsPerLine*2, обрезаем до максимума
+  // Максимум 10 слов всего (5 слов на строку)
   const maxTotalWords = maxWordsPerLine * 2;
   const wordsToUse = words.length > maxTotalWords ? words.slice(0, maxTotalWords) : words;
 
-  // Делим на две строки максимально равномерно
+  // Делим на две строки
   const midPoint = Math.ceil(wordsToUse.length / 2);
   return [wordsToUse.slice(0, midPoint), wordsToUse.slice(midPoint)];
 }
@@ -192,7 +192,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   const whiteColor = '&HFFFFFF&';
   const blackShadow = '&H000000&';
   const baseFontSize = Math.round(videoHeight / 20);
-  const activeFontSize = Math.round(baseFontSize * 1.4); // Увеличиваем на 40%
+  const activeFontSize = Math.round(baseFontSize * 1.15); // Увеличиваем на 15%
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
     `PlayResX: ${videoWidth}\n` +
@@ -207,19 +207,23 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
   segments.forEach((seg, i) => {
     if (Array.isArray(seg.words) && seg.words.length > 0) {
+      // Ограничиваем количество слов до 10 (2 строки по 5 слов)
+      const maxWords = 10;
+      const wordsToProcess = seg.words.length > maxWords ? seg.words.slice(0, maxWords) : seg.words;
+      
       // Для каждого слова — отдельный Dialogue, где только оно подсвечено
-      for (let j = 0; j < seg.words.length; j++) {
-        const w = seg.words[j];
+      for (let j = 0; j < wordsToProcess.length; j++) {
+        const w = wordsToProcess[j];
         const start = assTime(w.start);
         const end = assTime(w.end);
-        const lines = splitPhraseToLines(seg.words, 4);
+        const lines = splitPhraseToLines(wordsToProcess, 5);
         let lineTexts = lines.map(lineWords =>
           lineWords.map((word, idx) => {
             const wordText = typeof word.text === 'string' ? word.text : (typeof word.word === 'string' ? word.word : '');
-            const globalIdx = seg.words.indexOf(word);
+            const globalIdx = wordsToProcess.indexOf(word);
             if (globalIdx === j) {
-              // Активное слово: цвет по стилю, жирный, увеличенный размер, яркая тень
-              return `{\\c${activeColor}\\b1\\shad8\\4c${activeShadow}\\fs${activeFontSize}\\fscx110\\fscy110}${wordText}{\\r}`;
+              // Активное слово: цвет по стилю, жирный, немного увеличенный размер, черная тень
+              return `{\\c${activeColor}\\b1\\shad3\\4c${blackShadow}\\fs${activeFontSize}}${wordText}{\\r}`;
             } else {
               // Обычное слово: белый, стандартный размер
               return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}}${wordText}{\\r}`;
