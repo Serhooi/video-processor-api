@@ -201,12 +201,15 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     `\n`;
   ass += `[V4+ Styles]\n`;
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
-  ass += `Style: Default,Arial,${baseFontSize},${whiteColor},${whiteColor},${blackShadow},${blackShadow},0,0,0,0,100,100,0,0,1,0,0,2,60,60,${Math.round(videoHeight / 16)},1\n`;
+  ass += `Style: Default,Arial,${baseFontSize},${whiteColor},${activeColor},${blackShadow},${blackShadow},1,0,0,0,100,100,0,0,1,2,2,2,60,60,${Math.round(videoHeight / 16)},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
   segments.forEach((seg, i) => {
     if (Array.isArray(seg.words) && seg.words.length > 0) {
+      // Логируем для отладки
+      console.log(`Segment ${i}: ${seg.words.length} words:`, seg.words.map(w => w.word || w.text).join(' '));
+      
       // Ограничиваем количество слов до 10 (2 строки по 5 слов)
       const maxWords = 10;
       const wordsToProcess = seg.words.length > maxWords ? seg.words.slice(0, maxWords) : seg.words;
@@ -221,8 +224,8 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
           const wordText = typeof word.text === 'string' ? word.text : (typeof word.word === 'string' ? word.word : '');
           const wordDuration = Math.round((word.end - word.start) * 100); // длительность в сантисекундах
 
-          // Караоке тег: слово белое, потом становится цветным и увеличенным
-          return `{\\k${wordDuration}\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}}${wordText} {\\c${activeColor}\\b1\\shad3\\4c${blackShadow}\\fs${activeFontSize}}`;
+          // Правильный караоке синтаксис: \k определяет когда слово становится активным
+          return `{\\k${wordDuration}}${wordText} `;
         }).join('')
       ).join('\\N');
 
