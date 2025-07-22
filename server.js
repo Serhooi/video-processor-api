@@ -168,20 +168,19 @@ function splitPhraseToLines(words, maxWordsPerLine = 6) {
 }
 
 function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
-  // Нормализуем стиль
   style = (typeof style === 'string' ? style.toLowerCase().trim() : 'modern');
-  // Цвета и стили для modern (жёлтый), neon (голубой), fire, elegant
   const styleColors = {
     modern: { active: '&HFFD700&', shadow: '&H80FFD700&' },
     neon:   { active: '&H00FFFF&', shadow: '&H8000FFFF&' },
     fire:   { active: '&HFF4500&', shadow: '&H80FF4500&' },
     elegant:{ active: '&HD4AF37&', shadow: '&H80D4AF37&' }
   };
-  // Всегда жёлтый для modern
   const activeColor = styleColors[style] ? styleColors[style].active : styleColors.modern.active;
-  const activeShadow = styleColors[style] ? styleColors[style].shadow : styleColors.modern.shadow;
+  const activeShadow = styleColors[style] ? styleColors[style].shadow : styleColors[style].shadow;
   const whiteColor = '&HFFFFFF&';
   const blackShadow = '&H000000&';
+  const baseFontSize = Math.round(videoHeight/20);
+  const activeFontSize = baseFontSize + 2;
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
     `PlayResX: ${videoWidth}\n` +
@@ -190,7 +189,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     `\n`;
   ass += `[V4+ Styles]\n`;
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
-  ass += `Style: Default,Arial,${Math.round(videoHeight/20)},${whiteColor},${whiteColor},${blackShadow},${blackShadow},0,0,0,0,100,100,0,0,1,0,0,2,60,60,${Math.round(videoHeight/16)},1\n`;
+  ass += `Style: Default,Arial,${baseFontSize},${whiteColor},${whiteColor},${blackShadow},${blackShadow},0,0,0,0,100,100,0,0,1,0,0,2,60,60,${Math.round(videoHeight/16)},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
@@ -200,19 +199,17 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         const w = seg.words[j];
         const start = assTime(w.start);
         const end = assTime(w.end);
-        // Максимум две строки
         const lines = splitPhraseToLines(seg.words, 6);
         let lineTexts = lines.map(lineWords =>
           lineWords.map((word, idx) => {
             const wordText = typeof word.text === 'string' ? word.text : '';
-            // Глобальный индекс слова в сегменте
             const globalIdx = seg.words.indexOf(word);
             if (globalIdx === j) {
-              // Активное слово
-              return `{\\c${activeColor}\\b1\\shad10\\4c${activeShadow}}${wordText}{\\r}`;
+              // Активное слово: цвет по стилю, жирный, тень по стилю, увеличен на 2px
+              return `{\\c${activeColor}\\b1\\shad10\\4c${activeShadow}\\fs${activeFontSize}}${wordText}{\\r}`;
             } else {
               // Обычное слово
-              return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}}${wordText}{\\r}`;
+              return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}}${wordText}{\\r}`;
             }
           }).join(' ')
         );
@@ -220,11 +217,10 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
       }
     } else {
-      // Если нет words — вся фраза одним Dialogue, белым стилем
       const start = assTime(seg.start);
       const end = assTime(seg.end);
       const text = typeof seg.text === 'string' ? seg.text : '';
-      ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}}${text}{\\r}\n`;
+      ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}}${text}{\\r}\n`;
     }
   });
   return ass;
