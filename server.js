@@ -96,42 +96,33 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
   // Цвета ASS: &HAABBGGRR (BBGGRR, AA — прозрачность)
   // Преобразование hex цвета в ASS
   function hexToAss(hex, alpha = '00') {
-    const c = hex.replace('#', '');
-    return `&H${alpha}${c.slice(4,6)}${c.slice(2,4)}${c.slice(0,2)}`;
+    // hex: #RRGGBB, alpha: '00' (opaque) to 'FF' (transparent)
+    const r = hex.slice(1, 3);
+    const g = hex.slice(3, 5);
+    const b = hex.slice(5, 7);
+    return `&H${alpha}${b}${g}${r}&`;
   }
   // Маппинг стилей
   const styles = {
     modern: {
-      name: 'Modern',
-      font: 'Montserrat',
-      size: videoHeight > videoWidth ? 80 : 48,
+      name: 'Default',
+      font: 'Montserrat Bold',
+      size: Math.round(videoHeight / 13),
       primary: hexToAss('#FFFFFF'),
-      karaoke: hexToAss('#FFD700'),
-      outline: 2,
+      karaoke: hexToAss('#FFD700'), // Ярко-жёлтый
       outlineColor: hexToAss('#000000'),
-      backColor: '&H64000000', // полупрозрачный чёрный
-      bold: -1,
-      shadow: 2,
-      alignment: 2,
-      marginV: 80,
-      italic: 0,
-      glow: 0
+      backColor: hexToAss('#000000', 'FF'),
+      marginV: Math.round(videoHeight / 16),
     },
     neon: {
-      name: 'Neon',
-      font: 'Montserrat',
-      size: videoHeight > videoWidth ? 80 : 48,
-      primary: hexToAss('#00FFFF'),
-      karaoke: hexToAss('#00FFFF'),
-      outline: 2,
-      outlineColor: hexToAss('#FF00FF'),
-      backColor: '&H60000000',
-      bold: -1,
-      shadow: 4,
-      alignment: 2,
-      marginV: 80,
-      italic: 0,
-      glow: 1
+      name: 'Default',
+      font: 'Montserrat Bold',
+      size: Math.round(videoHeight / 13),
+      primary: hexToAss('#FFFFFF'),
+      karaoke: hexToAss('#00FFFF'), // Голубой
+      outlineColor: hexToAss('#000000'),
+      backColor: hexToAss('#000000', 'FF'),
+      marginV: Math.round(videoHeight / 16),
     },
     fire: {
       name: 'Fire',
@@ -170,10 +161,12 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
 }
 
 function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
-  // Цвет glow для активного слова (ярко-жёлтый)
-  const highlightColor = '&H00FFFF00&'; // FFFF00 (ярко-жёлтый, BGR)
-  const shadowColor = '&H00000000&'; // чёрный
-  const whiteColor = '&H00FFFFFF&'; // белый
+  const s = getASSStyles(style, videoWidth, videoHeight);
+  // Цвета для glow/shadow с прозрачностью 50%
+  const highlightColor = s.karaoke; // основной цвет стиля
+  const highlightShadow = highlightColor.replace('&H00', '&H80'); // alpha=80 (50%)
+  const whiteColor = s.primary;
+  const blackShadow = s.outlineColor.replace('&H00', '&H80'); // чёрный с alpha=80
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
     `PlayResX: ${videoWidth}\n` +
@@ -182,7 +175,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     `\n`;
   ass += `[V4+ Styles]\n`;
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
-  ass += `Style: Default,Montserrat Bold,${videoHeight/13|0},${whiteColor},${whiteColor},${shadowColor},${shadowColor},-1,0,0,0,100,100,0,0,1,0,0,2,60,60,${(videoHeight/16|0)},1\n`;
+  ass += `Style: Default,${s.font},${s.size},${whiteColor},${whiteColor},${s.outlineColor},${s.backColor},-1,0,0,0,100,100,0,0,1,0,0,2,60,60,${s.marginV},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
@@ -196,11 +189,11 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         let phrase = seg.words.map((word, idx) => {
           const wordText = typeof word.text === 'string' ? word.text : '';
           if (idx === j) {
-            // Активное слово — ярко-жёлтый, жирный, жёлтая тень (glow)
-            return `{\\c${highlightColor}\\b1\\shad3\\4c${highlightColor}}${wordText}{\\r}`;
+            // Активное слово — цвет стиля, жирный, мягкая тень (glow) с alpha=80, \shad6
+            return `{\\c${highlightColor}\\b1\\shad6\\4c${highlightShadow}}${wordText}{\\r}`;
           } else {
-            // Остальные — белый, жирный, чёрная тень
-            return `{\\c${whiteColor}\\b1\\shad3\\4c${shadowColor}}${wordText}{\\r}`;
+            // Остальные — белый, жирный, чёрная тень с alpha=80, \shad6
+            return `{\\c${whiteColor}\\b1\\shad6\\4c${blackShadow}}${wordText}{\\r}`;
           }
         }).join(' ');
         ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
@@ -210,7 +203,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
       const start = assTime(seg.start);
       const end = assTime(seg.end);
       const text = typeof seg.text === 'string' ? seg.text : '';
-      ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\c${whiteColor}\\b1\\shad3\\4c${shadowColor}}${text}{\\r}\n`;
+      ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\c${whiteColor}\\b1\\shad6\\4c${blackShadow}}${text}{\\r}\n`;
     }
   });
   return ass;
