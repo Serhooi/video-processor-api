@@ -162,25 +162,14 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
 }
 
 function splitPhraseToLines(words, maxWordsPerLine = 6) {
-  // Разбивает массив слов на максимум две строки (по maxWordsPerLine)
-  const lines = [];
-  let current = [];
-  for (let i = 0; i < words.length; i++) {
-    current.push(words[i]);
-    if (current.length === maxWordsPerLine || i === words.length - 1) {
-      lines.push(current);
-      current = [];
-    }
-    if (lines.length === 2 && i < words.length - 1) {
-      // Если слов больше, чем 2 строки, всё остальное во вторую строку
-      lines[1] = lines[1].concat(words.slice(i + 1));
-      break;
-    }
-  }
-  return lines;
+  // Разбивает массив слов на максимум две строки (всё, что не влезло — во вторую)
+  if (words.length <= maxWordsPerLine) return [words];
+  return [words.slice(0, maxWordsPerLine), words.slice(maxWordsPerLine)];
 }
 
 function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
+  // Нормализуем стиль
+  style = (typeof style === 'string' ? style.toLowerCase().trim() : 'modern');
   // Цвета и стили для modern (жёлтый), neon (голубой), fire, elegant
   const styleColors = {
     modern: { active: '&HFFD700&', shadow: '&H80FFD700&' },
@@ -188,8 +177,9 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     fire:   { active: '&HFF4500&', shadow: '&H80FF4500&' },
     elegant:{ active: '&HD4AF37&', shadow: '&H80D4AF37&' }
   };
-  const activeColor = (styleColors[style] || styleColors.modern).active;
-  const activeShadow = (styleColors[style] || styleColors.modern).shadow;
+  // Всегда жёлтый для modern
+  const activeColor = styleColors[style] ? styleColors[style].active : styleColors.modern.active;
+  const activeShadow = styleColors[style] ? styleColors[style].shadow : styleColors.modern.shadow;
   const whiteColor = '&HFFFFFF&';
   const blackShadow = '&H000000&';
   let ass = `[Script Info]\n` +
@@ -200,7 +190,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     `\n`;
   ass += `[V4+ Styles]\n`;
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
-  ass += `Style: Default,Arial,${Math.round(videoHeight/18)},${whiteColor},${whiteColor},${blackShadow},${blackShadow},0,0,0,0,100,100,0,0,1,0,0,2,60,60,${Math.round(videoHeight/16)},1\n`;
+  ass += `Style: Default,Arial,${Math.round(videoHeight/20)},${whiteColor},${whiteColor},${blackShadow},${blackShadow},0,0,0,0,100,100,0,0,1,0,0,2,60,60,${Math.round(videoHeight/16)},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
@@ -210,9 +200,8 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         const w = seg.words[j];
         const start = assTime(w.start);
         const end = assTime(w.end);
-        // Разбиваем на максимум две строки
+        // Максимум две строки
         const lines = splitPhraseToLines(seg.words, 6);
-        // Собираем текст с подсветкой только активного слова
         let lineTexts = lines.map(lineWords =>
           lineWords.map((word, idx) => {
             const wordText = typeof word.text === 'string' ? word.text : '';
@@ -227,7 +216,6 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
             }
           }).join(' ')
         );
-        // Если две строки — соединяем через \N (перенос строки в ASS)
         const phrase = lineTexts.join('\\N');
         ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
       }
