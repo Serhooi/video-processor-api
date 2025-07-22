@@ -185,35 +185,18 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         const w = seg.words[j];
         const start = assTime(w.start);
         const end = assTime(w.end);
-        const wordDur = w.end - w.start;
-        // Для прыжка: первая часть (jump) — 0.1 сек или 20% длительности, вторая — остальное
-        const jumpDur = Math.min(0.1, wordDur * 0.2);
-        const jumpEnd = w.start + jumpDur;
         // Собираем всю фразу, выделяя только текущее слово
-        let phraseJump = seg.words.map((word, idx) => {
+        let phrase = seg.words.map((word, idx) => {
           const wordText = typeof word.text === 'string' ? word.text : '';
           if (idx === j) {
-            // Активное слово — увеличенный масштаб
-            return `{\\c${highlightColor}\\b1\\shad10\\4c${highlightShadow}\\fscx110\\fscy110}${wordText}{\\r}`;
+            // Активное слово — цвет стиля, жирный, тень такого же цвета с alpha=80, \shad10
+            return `{\\c${highlightColor}\\b1\\shad10\\4c${highlightShadow}}${wordText}{\\r}`;
           } else {
-            // Остальные — белый, жирный, чёрная тень без прозрачности, \\shad3
+            // Остальные — белый, жирный, чёрная тень без прозрачности, \shad3
             return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}}${wordText}{\\r}`;
           }
         }).join(' ');
-        let phraseNormal = seg.words.map((word, idx) => {
-          const wordText = typeof word.text === 'string' ? word.text : '';
-          if (idx === j) {
-            // Активное слово — обычный масштаб
-            return `{\\c${highlightColor}\\b1\\shad10\\4c${highlightShadow}\\fscx100\\fscy100}${wordText}{\\r}`;
-          } else {
-            // Остальные — белый, жирный, чёрная тень без прозрачности, \\shad3
-            return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}}${wordText}{\\r}`;
-          }
-        }).join(' ');
-        // Dialogue для прыжка
-        ass += `Dialogue: 0,${assTime(w.start)},${assTime(jumpEnd)},Default,,0,0,0,,${phraseJump}\n`;
-        // Dialogue для обычного размера
-        ass += `Dialogue: 0,${assTime(jumpEnd)},${end},Default,,0,0,0,,${phraseNormal}\n`;
+        ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
       }
     } else {
       // Если нет words — вся фраза одним Dialogue, белым стилем
