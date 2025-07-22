@@ -209,7 +209,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     if (Array.isArray(seg.words) && seg.words.length > 0) {
       // Логируем для отладки
       console.log(`Segment ${i}: ${seg.words.length} words:`, seg.words.map(w => w.word || w.text).join(' '));
-      
+
       // Ограничиваем количество слов до 10 (2 строки по 5 слов)
       const maxWords = 10;
       const wordsToProcess = seg.words.length > maxWords ? seg.words.slice(0, maxWords) : seg.words;
@@ -224,8 +224,8 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
           const wordText = typeof word.text === 'string' ? word.text : (typeof word.word === 'string' ? word.word : '');
           const wordDuration = Math.round((word.end - word.start) * 100); // длительность в сантисекундах
 
-          // Правильный караоке синтаксис: \k определяет когда слово становится активным
-          return `{\\k${wordDuration}}${wordText} `;
+          // Караоке с увеличением размера активного слова
+          return `{\\k${wordDuration}\\fs${baseFontSize}}${wordText} {\\fs${activeFontSize}}`;
         }).join('')
       ).join('\\N');
 
