@@ -301,7 +301,17 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         }
 
         const start = assTime(w.start);
-        const end = assTime(w.end);
+        
+        // Продлеваем диалог до начала следующего слова чтобы избежать пропадания
+        let endTime = w.end;
+        if (j < wordsToProcess.length - 1) {
+          const nextWord = wordsToProcess[j + 1];
+          if (nextWord.start > w.end) {
+            endTime = nextWord.start - 0.01; // Небольшой зазор
+          }
+        }
+        
+        const end = assTime(endTime);
         
         // Отладка для последнего слова
         if (j === wordsToProcess.length - 1) {
