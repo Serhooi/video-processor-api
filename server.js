@@ -259,7 +259,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   const activeShadow = styleColors[style] ? styleColors[style].shadow : styleColors.modern.shadow;
   const whiteColor = '&HFFFFFF&';
   const blackShadow = '&H000000&';
-  const baseFontSize = Math.round(videoHeight / 20);
+  const baseFontSize = Math.round(videoHeight / 28); // Еще меньше
   const activeFontSize = Math.round(baseFontSize * 1.15); // Увеличиваем на 15%
   let ass = `[Script Info]\n` +
     `ScriptType: v4.00+\n` +
@@ -279,7 +279,24 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   processedSegments.forEach((seg, i) => {
     if (Array.isArray(seg.words) && seg.words.length > 0) {
       // Логируем для отладки
-      console.log(`Segment ${i}: ${seg.words.length} words:`, seg.words.map(w => w.word || w.text).join(' '));
+      console.log(`\n📝 Segment ${i}: ${seg.words.length} words:`, seg.words.map(w => w.word || w.text).join(' '));
+      
+      // Показываем временные метки первых и последних слов
+      if (seg.words.length > 0) {
+        const firstWord = seg.words[0];
+        const lastWord = seg.words[seg.words.length - 1];
+        console.log(`⏰ Timing: ${firstWord.start}s - ${lastWord.end}s`);
+        
+        // Проверяем есть ли большие паузы между словами
+        for (let k = 0; k < seg.words.length - 1; k++) {
+          const current = seg.words[k];
+          const next = seg.words[k + 1];
+          const gap = next.start - current.end;
+          if (gap > 0.5) {
+            console.log(`⚠️ Large gap: "${current.word || current.text}" -> "${next.word || next.text}" (${gap.toFixed(2)}s)`);
+          }
+        }
+      }
 
       // Фильтруем пустые слова и ограничиваем количество
       const validWords = seg.words.filter(word => {
@@ -301,7 +318,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         }
 
         const start = assTime(w.start);
-        
+
         // Продлеваем диалог до начала следующего слова чтобы избежать пропадания
         let endTime = w.end;
         if (j < wordsToProcess.length - 1) {
@@ -310,9 +327,9 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
             endTime = nextWord.start - 0.01; // Небольшой зазор
           }
         }
-        
+
         const end = assTime(endTime);
-        
+
         // Отладка для последнего слова
         if (j === wordsToProcess.length - 1) {
           console.log(`🔚 Last word in segment ${i}: "${w.word || w.text}" (${w.start}s - ${w.end}s)`);
