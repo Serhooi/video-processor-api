@@ -189,7 +189,7 @@ function fillGaps(segments, maxGap = 1.5) {
     if (Array.isArray(currentSeg.words) && currentSeg.words.length > 0) {
       // Фильтруем валидные слова в текущем сегменте
       const validWords = currentSeg.words.filter(word => {
-        const wordText = word.text || word.word || word.Text || word.Word || '';
+        const wordText = (word.text || word.word || word.Text || word.Word || '').toUpperCase();
         return wordText.trim() !== '' && typeof word.start === 'number' && typeof word.end === 'number';
       });
 
@@ -203,7 +203,7 @@ function fillGaps(segments, maxGap = 1.5) {
       // Если есть следующий сегмент и пауза не слишком большая
       if (nextSeg && Array.isArray(nextSeg.words) && nextSeg.words.length > 0) {
         const nextValidWords = nextSeg.words.filter(word => {
-          const wordText = word.text || word.word || word.Text || word.Word || '';
+          const wordText = (word.text || word.word || word.Text || word.Word || '').toUpperCase();
           return wordText.trim() !== '' && typeof word.start === 'number' && typeof word.end === 'number';
         });
 
@@ -244,7 +244,64 @@ function fillGaps(segments, maxGap = 1.5) {
   return result;
 }
 
-function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280) {
+// Функция для обработки эмоджи в тексте
+function processEmoji(text, autoEmoji) {
+  if (!autoEmoji) {
+    return text;
+  }
+  
+  // Простая замена некоторых слов на эмоджи
+  const emojiMap = {
+    'ПРИВЕТ': '👋 ПРИВЕТ',
+    'ПОКА': 'ПОКА 👋',
+    'СПАСИБО': 'СПАСИБО 🙏',
+    'ОТЛИЧНО': 'ОТЛИЧНО 👍',
+    'ХОРОШО': 'ХОРОШО 👍',
+    'ПЛОХО': 'ПЛОХО 👎',
+    'ЛЮБОВЬ': 'ЛЮБОВЬ ❤️',
+    'СЕРДЦЕ': 'СЕРДЦЕ ❤️',
+    'ОГОНЬ': 'ОГОНЬ 🔥',
+    'ЗВЕЗДА': 'ЗВЕЗДА ⭐',
+    'СОЛНЦЕ': 'СОЛНЦЕ ☀️',
+    'ДОЖДЬ': 'ДОЖДЬ 🌧️',
+    'СНЕГ': 'СНЕГ ❄️',
+    'МУЗЫКА': 'МУЗЫКА 🎵',
+    'ТАНЕЦ': 'ТАНЕЦ 💃',
+    'СМЕХ': 'СМЕХ 😂',
+    'УЛЫБКА': 'УЛЫБКА 😊'
+  };
+  
+  return emojiMap[text] || text;
+}
+
+// Функция для получения стилей субтитров с позиционированием
+function getSubtitleStyle(subtitlePosition, videoHeight, baseFontSize) {
+  const positions = {
+    top: {
+      alignment: 8, // Top center
+      marginV: Math.round(videoHeight * 0.1) // 10% от высоты сверху
+    },
+    center: {
+      alignment: 5, // Middle center
+      marginV: 0
+    },
+    bottom: {
+      alignment: 2, // Bottom center
+      marginV: Math.round(videoHeight * 0.1) // 10% от высоты снизу
+    }
+  };
+
+  const pos = positions[subtitlePosition] || positions.bottom;
+  
+  return {
+    alignment: pos.alignment,
+    marginV: pos.marginV,
+    marginL: 60,
+    marginR: 60
+  };
+}
+
+function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280, subtitlePosition = 'bottom', autoEmoji = false) {
   style = (typeof style === 'string' ? style.toLowerCase().trim() : 'modern');
 
   // Цвета для активных слов по стилям (ASS формат: &HBBGGRR&)
@@ -269,7 +326,10 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     `\n`;
   ass += `[V4+ Styles]\n`;
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
-  ass += `Style: Default,Arial,${baseFontSize},${whiteColor},${activeColor},${blackShadow},${blackShadow},1,0,0,0,100,100,0,0,1,2,2,2,60,60,${Math.round(videoHeight / 16)},1\n`;
+  // Получаем стили позиционирования
+  const subtitleStyle = getSubtitleStyle(subtitlePosition, videoHeight, baseFontSize);
+  
+  ass += `Style: Default,Arial,${baseFontSize},${whiteColor},${activeColor},${blackShadow},${blackShadow},1,0,0,0,100,100,0,0,1,2,2,${subtitleStyle.alignment},${subtitleStyle.marginL},${subtitleStyle.marginR},${subtitleStyle.marginV},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
@@ -279,28 +339,28 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   processedSegments.forEach((seg, i) => {
     if (Array.isArray(seg.words) && seg.words.length > 0) {
       // Логируем для отладки
-      console.log(`\n📝 Segment ${i}: ${seg.words.length} words:`, seg.words.map(w => w.word || w.text).join(' '));
-      
+      console.log(`\n📝 Segment ${i}: ${seg.words.length} words:`, seg.words.map(w => (w.word || w.text || '').toUpperCase()).join(' '));
+
       // Показываем временные метки первых и последних слов
       if (seg.words.length > 0) {
         const firstWord = seg.words[0];
         const lastWord = seg.words[seg.words.length - 1];
         console.log(`⏰ Timing: ${firstWord.start}s - ${lastWord.end}s`);
-        
+
         // Проверяем есть ли большие паузы между словами
         for (let k = 0; k < seg.words.length - 1; k++) {
           const current = seg.words[k];
           const next = seg.words[k + 1];
           const gap = next.start - current.end;
           if (gap > 0.5) {
-            console.log(`⚠️ Large gap: "${current.word || current.text}" -> "${next.word || next.text}" (${gap.toFixed(2)}s)`);
+            console.log(`⚠️ Large gap: "${(current.word || current.text || '').toUpperCase()}" -> "${(next.word || next.text || '').toUpperCase()}" (${gap.toFixed(2)}s)`);
           }
         }
       }
 
       // Фильтруем пустые слова и ограничиваем количество
       const validWords = seg.words.filter(word => {
-        const wordText = word.text || word.word || word.Text || word.Word || '';
+        const wordText = (word.text || word.word || word.Text || word.Word || '').toUpperCase();
         return wordText.trim() !== '' && typeof word.start === 'number' && typeof word.end === 'number';
       });
 
@@ -332,14 +392,15 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
 
         // Отладка для последнего слова
         if (j === wordsToProcess.length - 1) {
-          console.log(`🔚 Last word in segment ${i}: "${w.word || w.text}" (${w.start}s - ${w.end}s)`);
+          console.log(`🔚 Last word in segment ${i}: "${(w.word || w.text || '').toUpperCase()}" (${w.start}s - ${w.end}s)`);
         }
 
         const lines = splitPhraseToLines(wordsToProcess, 5);
         let phrase = lines.map(lineWords =>
           lineWords.map((word) => {
-            // Улучшенная обработка текста слова
-            const wordText = word.text || word.word || word.Text || word.Word || '';
+            // Улучшенная обработка текста слова (заглавными буквами + эмоджи)
+            let wordText = (word.text || word.word || word.Text || word.Word || '').toUpperCase();
+            wordText = processEmoji(wordText, autoEmoji);
             const globalIdx = wordsToProcess.indexOf(word);
 
             // Отладка для проблемных слов
@@ -398,7 +459,14 @@ app.post('/api/burn-subtitles', async (req, res) => {
   const taskId = uuidv4();
 
   try {
-    const { videoUrl, transcript, style = 'modern', title = 'video' } = req.body;
+    const { 
+      videoUrl, 
+      transcript, 
+      style = 'modern', 
+      title = 'video',
+      subtitlePosition = 'bottom',
+      autoEmoji = false 
+    } = req.body;
 
     if (!videoUrl || !transcript || !Array.isArray(transcript)) {
       return res.status(400).json({
@@ -417,7 +485,7 @@ app.post('/api/burn-subtitles', async (req, res) => {
     console.log(`🎬 Starting task ${taskId} for video: ${title}`);
 
     // Запускаем обработку асинхронно
-    processVideo(taskId, videoUrl, transcript, style, title);
+    processVideo(taskId, videoUrl, transcript, style, title, subtitlePosition, autoEmoji);
 
     res.json({
       taskId,
@@ -460,7 +528,7 @@ app.get('/api/download/:taskId', (req, res) => {
 });
 
 // Основная функция обработки видео
-async function processVideo(taskId, videoUrl, transcript, style, title) {
+async function processVideo(taskId, videoUrl, transcript, style, title, subtitlePosition = 'bottom', autoEmoji = false) {
   const task = tasks.get(taskId);
 
   try {
@@ -487,7 +555,7 @@ async function processVideo(taskId, videoUrl, transcript, style, title) {
     console.log(`📝 Creating ASS file for task ${taskId}`);
 
     // Создаем ASS файл
-    const assContent = createASSContent(transcript, style);
+    const assContent = createASSContent(transcript, style, 720, 1280, subtitlePosition, autoEmoji);
     const assPath = path.join(TEMP_DIR, `${taskId}_subtitles.ass`);
     const assDebugPath = path.join(OUTPUT_DIR, `${taskId}_debug.ass`);
     // Логируем путь к debug-файлу

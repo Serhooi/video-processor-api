@@ -68,9 +68,19 @@ fly deploy
     }
   ],
   "style": "modern",
-  "title": "My Video"
+  "title": "My Video",
+  "subtitlePosition": "bottom",
+  "autoEmoji": false
 }
 ```
+
+**Параметры:**
+- `videoUrl` (обязательный) - URL видео файла
+- `transcript` (обязательный) - массив слов с временными метками
+- `style` (опциональный) - стиль субтитров: "modern", "neon", "fire", "elegant"
+- `title` (опциональный) - название видео
+- `subtitlePosition` (опциональный) - позиция субтитров: "top", "center", "bottom"
+- `autoEmoji` (опциональный) - автоматическое добавление эмоджи к словам
 
 **Response:**
 ```json
