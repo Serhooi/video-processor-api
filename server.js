@@ -31,7 +31,7 @@ const upload = multer({
 const tasks = new Map();
 
 // Создание SRT файла из transcript
-function createSRTContent(transcript, startOffset = 0) {
+function createSRTContent(transcript, startOffset = 0, autoEmoji = false) {
   let srtContent = '';
   let segmentIndex = 1;
 
@@ -51,7 +51,7 @@ function createSRTContent(transcript, startOffset = 0) {
       segments.push({
         start: currentSegment[0].start - startOffset,
         end: currentSegment[currentSegment.length - 1].end - startOffset,
-        text: currentSegment.map(w => w.word).join(' ')
+        text: addEmojisToText(currentSegment.map(w => w.word).join(' ').toUpperCase(), autoEmoji)
       });
       currentSegment = [];
     }
@@ -244,34 +244,76 @@ function fillGaps(segments, maxGap = 1.5) {
   return result;
 }
 
-// Функция для обработки эмоджи в тексте
-function processEmoji(text, autoEmoji) {
+// Функция для добавления эмоджи в текст субтитров (2-4 эмоджи на видео)
+function addEmojisToText(text, autoEmoji) {
   if (!autoEmoji) {
     return text;
   }
-  
-  // Простая замена некоторых слов на эмоджи
+
+  // Расширенная карта эмоджи для разных слов и фраз
   const emojiMap = {
+    // Приветствия
     'ПРИВЕТ': '👋 ПРИВЕТ',
+    'HELLO': '👋 HELLO',
+    'HI': '👋 HI',
     'ПОКА': 'ПОКА 👋',
-    'СПАСИБО': 'СПАСИБО 🙏',
-    'ОТЛИЧНО': 'ОТЛИЧНО 👍',
+    'BYE': 'BYE 👋',
+    
+    // Эмоции
+    'ОТЛИЧНО': 'ОТЛИЧНО �',
     'ХОРОШО': 'ХОРОШО 👍',
-    'ПЛОХО': 'ПЛОХО 👎',
+    'СУПЕР': 'СУПЕР 🔥',
+    'КРУТО': 'КРУТО 😎',
+    'ВАУ': 'ВАУ 😍',
+    'AMAZING': 'AMAZING 🤩',
+    'AWESOME': 'AWESOME �',
+    'GREAT': 'GREAT 👍',
+    'COOL': 'COOL 😎',
+    'WOW': 'WOW 😍',
+    
+    // Благодарности
+    'СПАСИБО': 'СПАСИБО 🙏',
+    'THANKS': 'THANKS 🙏',
+    'THANK YOU': 'THANK YOU 🙏',
+    
+    // Любовь и сердце
     'ЛЮБОВЬ': 'ЛЮБОВЬ ❤️',
     'СЕРДЦЕ': 'СЕРДЦЕ ❤️',
+    'LOVE': 'LOVE ❤️',
+    'HEART': 'HEART ❤️',
+    
+    // Природа
     'ОГОНЬ': 'ОГОНЬ 🔥',
-    'ЗВЕЗДА': 'ЗВЕЗДА ⭐',
+    'FIRE': 'FIRE 🔥',
     'СОЛНЦЕ': 'СОЛНЦЕ ☀️',
-    'ДОЖДЬ': 'ДОЖДЬ 🌧️',
-    'СНЕГ': 'СНЕГ ❄️',
+    'SUN': 'SUN ☀️',
+    'ЗВЕЗДА': 'ЗВЕЗДА ⭐',
+    'STAR': 'STAR ⭐',
+    
+    // Развлечения
     'МУЗЫКА': 'МУЗЫКА 🎵',
+    'MUSIC': 'MUSIC 🎵',
     'ТАНЕЦ': 'ТАНЕЦ 💃',
+    'DANCE': 'DANCE 💃',
+    'PARTY': 'PARTY 🎉',
+    'ПРАЗДНИК': 'ПРАЗДНИК 🎉',
+    
+    // Смех
     'СМЕХ': 'СМЕХ 😂',
-    'УЛЫБКА': 'УЛЫБКА 😊'
+    'СМЕШНО': 'СМЕШНО 😂',
+    'FUNNY': 'FUNNY 😂',
+    'LOL': 'LOL 😂',
+    'HAHA': 'HAHA 😂'
   };
-  
-  return emojiMap[text] || text;
+
+  // Обрабатываем текст по словам
+  const words = text.split(' ');
+  const processedWords = words.map(word => {
+    const cleanWord = word.trim().toUpperCase();
+    return emojiMap[cleanWord] || word;
+  });
+
+  return processedWords.join(' ');
 }
 
 // Функция для получения стилей субтитров с позиционированием
@@ -292,7 +334,7 @@ function getSubtitleStyle(subtitlePosition, videoHeight, baseFontSize) {
   };
 
   const pos = positions[subtitlePosition] || positions.bottom;
-  
+
   return {
     alignment: pos.alignment,
     marginV: pos.marginV,
@@ -328,7 +370,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
   // Получаем стили позиционирования
   const subtitleStyle = getSubtitleStyle(subtitlePosition, videoHeight, baseFontSize);
-  
+
   ass += `Style: Default,Arial,${baseFontSize},${whiteColor},${activeColor},${blackShadow},${blackShadow},1,0,0,0,100,100,0,0,1,2,2,${subtitleStyle.alignment},${subtitleStyle.marginL},${subtitleStyle.marginR},${subtitleStyle.marginV},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
@@ -400,7 +442,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
           lineWords.map((word) => {
             // Улучшенная обработка текста слова (заглавными буквами + эмоджи)
             let wordText = (word.text || word.word || word.Text || word.Word || '').toUpperCase();
-            wordText = processEmoji(wordText, autoEmoji);
+            wordText = addEmojisToText(wordText, autoEmoji);
             const globalIdx = wordsToProcess.indexOf(word);
 
             // Отладка для проблемных слов
@@ -459,13 +501,13 @@ app.post('/api/burn-subtitles', async (req, res) => {
   const taskId = uuidv4();
 
   try {
-    const { 
-      videoUrl, 
-      transcript, 
-      style = 'modern', 
+    const {
+      videoUrl,
+      transcript,
+      style = 'modern',
       title = 'video',
       subtitlePosition = 'bottom',
-      autoEmoji = false 
+      autoEmoji = false
     } = req.body;
 
     if (!videoUrl || !transcript || !Array.isArray(transcript)) {
