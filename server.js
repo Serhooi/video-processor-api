@@ -51,7 +51,7 @@ function createSRTContent(transcript, startOffset = 0, autoEmoji = false) {
       segments.push({
         start: currentSegment[0].start - startOffset,
         end: currentSegment[currentSegment.length - 1].end - startOffset,
-        text: addEmojisToText(currentSegment.map(w => w.word).join(' ').toUpperCase(), autoEmoji)
+        text: addEmojisToText(safeTextTransform(currentSegment.map(w => w.word).join(' ')), autoEmoji)
       });
       currentSegment = [];
     }
@@ -244,6 +244,22 @@ function fillGaps(segments, maxGap = 1.5) {
   return result;
 }
 
+// Функция для безопасного преобразования текста (не ломает китайские символы)
+function safeTextTransform(text) {
+  if (!text) return '';
+  
+  // Проверяем есть ли китайские символы (CJK)
+  const hasCJK = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/.test(text);
+  
+  if (hasCJK) {
+    // Для китайского текста не применяем toUpperCase
+    return text;
+  } else {
+    // Для латиницы и кириллицы применяем toUpperCase
+    return text.toUpperCase();
+  }
+}
+
 // Функция для добавления эмоджи в текст субтитров (2-4 эмоджи на видео)
 function addEmojisToText(text, autoEmoji) {
   if (!autoEmoji) {
@@ -303,13 +319,28 @@ function addEmojisToText(text, autoEmoji) {
     'СМЕШНО': 'СМЕШНО 😂',
     'FUNNY': 'FUNNY 😂',
     'LOL': 'LOL 😂',
-    'HAHA': 'HAHA 😂'
+    'HAHA': 'HAHA 😂',
+    
+    // Китайские
+    '你好': '👋 你好',
+    '谢谢': '谢谢 🙏',
+    '太棒了': '太棒了 👍',
+    '很好': '很好 👍',
+    '音乐': '音乐 🎵',
+    '跳舞': '跳舞 💃',
+    '爱': '爱 ❤️',
+    '心': '心 ❤️',
+    '火': '火 🔥',
+    '星星': '星星 ⭐',
+    '太阳': '太阳 ☀️',
+    '笑': '笑 😂',
+    '开心': '开心 😊'
   };
 
   // Обрабатываем текст по словам
   const words = text.split(' ');
   const processedWords = words.map(word => {
-    const cleanWord = word.trim().toUpperCase();
+    const cleanWord = safeTextTransform(word.trim());
     return emojiMap[cleanWord] || word;
   });
 
@@ -365,13 +396,16 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
     `PlayResX: ${videoWidth}\n` +
     `PlayResY: ${videoHeight}\n` +
     `ScaledBorderAndShadow: yes\n` +
+    `YCbCr Matrix: TV.709\n` +
     `\n`;
   ass += `[V4+ Styles]\n`;
   ass += `Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
   // Получаем стили позиционирования
   const subtitleStyle = getSubtitleStyle(subtitlePosition, videoHeight, baseFontSize);
 
-  ass += `Style: Default,Arial,${baseFontSize},${whiteColor},${activeColor},${blackShadow},${blackShadow},1,0,0,0,100,100,0,0,1,2,2,${subtitleStyle.alignment},${subtitleStyle.marginL},${subtitleStyle.marginR},${subtitleStyle.marginV},1\n`;
+  // Используем шрифт с поддержкой Unicode для китайских символов
+  const fontName = 'Noto Sans CJK SC,Microsoft YaHei,SimHei,Arial Unicode MS,Arial';
+  ass += `Style: Default,${fontName},${baseFontSize},${whiteColor},${activeColor},${blackShadow},${blackShadow},1,0,0,0,100,100,0,0,1,2,2,${subtitleStyle.alignment},${subtitleStyle.marginL},${subtitleStyle.marginR},${subtitleStyle.marginV},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
@@ -440,8 +474,8 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         const lines = splitPhraseToLines(wordsToProcess, 5);
         let phrase = lines.map(lineWords =>
           lineWords.map((word) => {
-            // Улучшенная обработка текста слова (заглавными буквами + эмоджи)
-            let wordText = (word.text || word.word || word.Text || word.Word || '').toUpperCase();
+            // Улучшенная обработка текста слова (безопасное преобразование + эмоджи)
+            let wordText = safeTextTransform(word.text || word.word || word.Text || word.Word || '');
             wordText = addEmojisToText(wordText, autoEmoji);
             const globalIdx = wordsToProcess.indexOf(word);
 
