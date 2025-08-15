@@ -387,7 +387,17 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   // Если данные приходят как массив слов [{word, start, end}], конвертируем в формат сегментов
   if (segments && segments.length > 0 && segments[0].word && !segments[0].words) {
     console.log('🔄 Converting word array to segments format');
-    processedSegments = [{ words: segments }];
+    
+    // НОВОЕ ИСПРАВЛЕНИЕ: Группируем слова в сегменты по 8-10 слов для лучшей производительности
+    const wordsPerSegment = 10;
+    processedSegments = [];
+    
+    for (let i = 0; i < segments.length; i += wordsPerSegment) {
+      const segmentWords = segments.slice(i, i + wordsPerSegment);
+      processedSegments.push({ words: segmentWords });
+    }
+    
+    console.log(`✅ Created ${processedSegments.length} segments from ${segments.length} words`);
   }
   
   console.log(`✅ Using ${processedSegments.length} segments for processing`);
@@ -457,12 +467,17 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         const start = assTime(w.start);
 
         // Продлеваем диалог до начала следующего слова чтобы избежать пропадания
+        // ИСПРАВЛЕНИЕ: Продлеваем время показа каждого слова чтобы избежать пропадания
         let endTime = w.end;
         if (j < wordsToProcess.length - 1) {
           const nextWord = wordsToProcess[j + 1];
+          // Продлеваем до начала следующего слова, но минимум на 0.3 секунды
           if (nextWord.start > w.end) {
-            endTime = nextWord.start - 0.01; // Небольшой зазор
+            endTime = Math.max(w.end, Math.min(nextWord.start - 0.05, w.start + 0.3));
           }
+        } else {
+          // Для последнего слова в сегменте продлеваем минимум на 0.5 секунды
+          endTime = Math.max(w.end, w.start + 0.5);
         }
 
         const end = assTime(endTime);
