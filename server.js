@@ -704,6 +704,34 @@ async function processVideo(taskId, videoUrl, transcript, style, title, subtitle
 
     // Обрабатываем видео с FFmpeg
     const outputPath = path.join(OUTPUT_DIR, `${taskId}_output.mp4`);
+    
+    // Дополнительная проверка ASS файла перед FFmpeg
+    console.log('🚨 CRITICAL CHECK - ASS file before FFmpeg:');
+    console.log('  - ASS path:', assPath);
+    console.log('  - ASS exists:', await fs.pathExists(assPath));
+    if (await fs.pathExists(assPath)) {
+      const stats = await fs.stat(assPath);
+      console.log('  - ASS size:', stats.size, 'bytes');
+      console.log('  - ASS permissions:', stats.mode);
+      
+      // Читаем первые и последние строки ASS файла
+      const content = await fs.readFile(assPath, 'utf8');
+      const lines = content.split('\n');
+      console.log('  - ASS first 5 lines:');
+      lines.slice(0, 5).forEach((line, i) => console.log(`    ${i + 1}: ${line}`));
+      console.log('  - ASS last 5 lines:');
+      lines.slice(-5).forEach((line, i) => console.log(`    ${lines.length - 4 + i}: ${line}`));
+      
+      // Проверяем, есть ли диалоги в ASS файле
+      const dialogueLines = lines.filter(line => line.startsWith('Dialogue:'));
+      console.log('  - Dialogue lines count:', dialogueLines.length);
+      if (dialogueLines.length > 0) {
+        console.log('  - First dialogue:', dialogueLines[0]);
+      }
+    } else {
+      console.log('❌ ASS FILE DOES NOT EXIST! This will cause subtitle:0KiB!');
+    }
+    
     await new Promise((resolve, reject) => {
       ffmpeg(videoPath)
         .videoFilters(`subtitles=${assPath}`)
@@ -717,6 +745,21 @@ async function processVideo(taskId, videoUrl, transcript, style, title, subtitle
           console.log(`  - ASS path in command: ${assPath}`);
           console.log(`  - ASS file exists when FFmpeg starts: ${fs.existsSync(assPath)}`);
           console.log(`  - ASS file size when FFmpeg starts: ${fs.existsSync(assPath) ? fs.statSync(assPath).size : 'N/A'} bytes`);
+          
+          // Проверяем содержимое ASS файла прямо перед FFmpeg
+          if (fs.existsSync(assPath)) {
+            try {
+              const content = fs.readFileSync(assPath, 'utf8');
+              const lines = content.split('\n');
+              const dialogueCount = lines.filter(line => line.startsWith('Dialogue:')).length;
+              console.log(`  - ASS file content check:`);
+              console.log(`    - Total lines: ${lines.length}`);
+              console.log(`    - Dialogue lines: ${dialogueCount}`);
+              console.log(`    - File ends with: ${lines[lines.length - 1]}`);
+            } catch (err) {
+              console.log(`  - Error reading ASS file: ${err.message}`);
+            }
+          }
         })
         .on('stderr', (stderrLine) => {
           console.log('FFmpeg stderr:', stderrLine);
