@@ -630,20 +630,77 @@ async function processVideo(taskId, videoUrl, transcript, style, title, subtitle
 
     console.log(`📝 Creating ASS file for task ${taskId}`);
 
+    // Добавляем подробное логирование transcript
+    console.log('🔍 Transcript validation:');
+    console.log('  - Is array:', Array.isArray(transcript));
+    console.log('  - Length:', transcript.length);
+    if (transcript.length > 0) {
+      console.log('  - First segment:', JSON.stringify(transcript[0], null, 2));
+      if (transcript[0].words) {
+        console.log('  - First segment words count:', transcript[0].words.length);
+        if (transcript[0].words.length > 0) {
+          console.log('  - First word:', JSON.stringify(transcript[0].words[0], null, 2));
+        }
+      }
+    }
+
     // Создаем ASS файл
+    console.log('🎨 Calling createASSContent with:');
+    console.log('  - style:', style);
+    console.log('  - subtitlePosition:', subtitlePosition);
+    console.log('  - autoEmoji:', autoEmoji);
+    
     const assContent = createASSContent(transcript, style, 720, 1280, subtitlePosition, autoEmoji);
+    
+    console.log('✅ ASS content created successfully');
+    console.log('  - Content length:', assContent.length, 'characters');
+    console.log('  - Content preview (first 200 chars):', assContent.substring(0, 200));
+    
     const assPath = path.join(TEMP_DIR, `${taskId}_subtitles.ass`);
     const assDebugPath = path.join(OUTPUT_DIR, `${taskId}_debug.ass`);
+    
+    console.log('📁 File paths:');
+    console.log('  - ASS file path:', assPath);
+    console.log('  - ASS debug path:', assDebugPath);
+    
+    // Проверяем существование папок
+    console.log('📁 Directory check:');
+    console.log('  - TEMP_DIR exists:', await fs.pathExists(TEMP_DIR));
+    console.log('  - OUTPUT_DIR exists:', await fs.pathExists(OUTPUT_DIR));
+    
     // Логируем путь к debug-файлу
     console.log('ASS debug file saved to:', assDebugPath);
+    
+    // Записываем файлы
     await fs.writeFile(assPath, assContent, 'utf8');
     await fs.writeFile(assDebugPath, assContent, 'utf8');
+    
+    // Проверяем, что файлы создались
+    console.log('✅ Files written successfully');
+    console.log('  - ASS file exists:', await fs.pathExists(assPath));
+    console.log('  - ASS file size:', (await fs.stat(assPath)).size, 'bytes');
+    console.log('  - Debug file exists:', await fs.pathExists(assDebugPath));
+    console.log('  - Debug file size:', (await fs.stat(assDebugPath)).size, 'bytes');
 
     task.progress = 40;
     task.status = 'processing';
 
     console.log(`🎬 Processing video with FFmpeg for task ${taskId}`);
     console.log('transcript:', transcript);
+
+    // Добавляем проверку ASS файла перед FFmpeg
+    console.log('🔍 Pre-FFmpeg ASS file check:');
+    console.log('  - ASS file path:', assPath);
+    console.log('  - ASS file exists:', await fs.pathExists(assPath));
+    if (await fs.pathExists(assPath)) {
+      console.log('  - ASS file size:', (await fs.stat(assPath)).size, 'bytes');
+      console.log('  - ASS file content (first 10 lines):');
+      const assFileContent = await fs.readFile(assPath, 'utf8');
+      const lines = assFileContent.split('\n').slice(0, 10);
+      lines.forEach((line, i) => console.log(`    ${i + 1}: ${line}`));
+    } else {
+      console.log('❌ ASS file does not exist! This will cause subtitle:0KiB error!');
+    }
 
     // Обрабатываем видео с FFmpeg
     const outputPath = path.join(OUTPUT_DIR, `${taskId}_output.mp4`);
@@ -656,6 +713,10 @@ async function processVideo(taskId, videoUrl, transcript, style, title, subtitle
         .output(outputPath)
         .on('start', (commandLine) => {
           console.log(`🔧 FFmpeg command: ${commandLine}`);
+          console.log(`🔍 ASS file details in FFmpeg command:`);
+          console.log(`  - ASS path in command: ${assPath}`);
+          console.log(`  - ASS file exists when FFmpeg starts: ${fs.existsSync(assPath)}`);
+          console.log(`  - ASS file size when FFmpeg starts: ${fs.existsSync(assPath) ? fs.statSync(assPath).size : 'N/A'} bytes`);
         })
         .on('stderr', (stderrLine) => {
           console.log('FFmpeg stderr:', stderrLine);
