@@ -223,12 +223,8 @@ function fillGaps(segments, maxGap = 1.5) {
               })
             };
             result.push(extendedSeg);
-            console.log(`📏 Extended segment ${i}: gap ${gap.toFixed(2)}s filled (${segmentEnd}s -> ${(nextSegmentStart - 0.1).toFixed(1)}s)`);
           } else {
             result.push(currentSeg);
-            if (gap > maxGap) {
-              console.log(`⏭️ Gap too large: ${gap.toFixed(2)}s (max ${maxGap}s)`);
-            }
           }
         } else {
           result.push(currentSeg);
@@ -375,6 +371,27 @@ function getSubtitleStyle(subtitlePosition, videoHeight, baseFontSize) {
 }
 
 function createASSContent(segments, style = 'modern', videoWidth = 720, videoHeight = 1280, subtitlePosition = 'bottom', autoEmoji = false) {
+  console.log(`🎬 createASSContent called with:`, {
+    segmentsCount: segments ? segments.length : 0,
+    style,
+    firstSegment: segments && segments[0] ? {
+      hasWords: !!segments[0].words,
+      wordsCount: segments[0].words ? segments[0].words.length : 0,
+      structure: Object.keys(segments[0])
+    } : 'no segments'
+  });
+  
+  // ИСПРАВЛЕНИЕ: Проверяем формат данных и конвертируем если нужно
+  let processedSegments = segments;
+  
+  // Если данные приходят как массив слов [{word, start, end}], конвертируем в формат сегментов
+  if (segments && segments.length > 0 && segments[0].word && !segments[0].words) {
+    console.log('🔄 Converting word array to segments format');
+    processedSegments = [{ words: segments }];
+  }
+  
+  console.log(`✅ Using ${processedSegments.length} segments for processing`);
+  
   style = (typeof style === 'string' ? style.toLowerCase().trim() : 'modern');
 
   // Цвета для активных слов по стилям (ASS формат: &HBBGGRR&)
@@ -403,35 +420,20 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   // Получаем стили позиционирования
   const subtitleStyle = getSubtitleStyle(subtitlePosition, videoHeight, baseFontSize);
 
-  // Используем шрифт с поддержкой Unicode для китайских символов
-  const fontName = 'Noto Sans CJK SC,Microsoft YaHei,SimHei,Arial Unicode MS,Arial';
+  // Используем один шрифт с поддержкой Unicode для китайских символов
+  const fontName = 'Arial Unicode MS';
   ass += `Style: Default,${fontName},${baseFontSize},${whiteColor},${activeColor},${blackShadow},${blackShadow},1,0,0,0,100,100,0,0,1,2,2,${subtitleStyle.alignment},${subtitleStyle.marginL},${subtitleStyle.marginR},${subtitleStyle.marginV},1\n`;
   ass += `\n`;
   ass += `[Events]\n`;
   ass += `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
   // Заполняем паузы между сегментами
-  const processedSegments = fillGaps(segments, 1.5); // Уменьшили до 1.5 сек
+  const finalSegments = fillGaps(processedSegments, 1.5); // Уменьшили до 1.5 сек
 
-  processedSegments.forEach((seg, i) => {
+  finalSegments.forEach((seg, i) => {
     if (Array.isArray(seg.words) && seg.words.length > 0) {
-      // Логируем для отладки
-      console.log(`\n📝 Segment ${i}: ${seg.words.length} words:`, seg.words.map(w => (w.word || w.text || '').toUpperCase()).join(' '));
-
-      // Показываем временные метки первых и последних слов
-      if (seg.words.length > 0) {
-        const firstWord = seg.words[0];
-        const lastWord = seg.words[seg.words.length - 1];
-        console.log(`⏰ Timing: ${firstWord.start}s - ${lastWord.end}s`);
-
-        // Проверяем есть ли большие паузы между словами
-        for (let k = 0; k < seg.words.length - 1; k++) {
-          const current = seg.words[k];
-          const next = seg.words[k + 1];
-          const gap = next.start - current.end;
-          if (gap > 0.5) {
-            console.log(`⚠️ Large gap: "${(current.word || current.text || '').toUpperCase()}" -> "${(next.word || next.text || '').toUpperCase()}" (${gap.toFixed(2)}s)`);
-          }
-        }
+      // Минимальное логирование для отладки
+      if (i === 0) {
+        console.log(`📝 Processing ${finalSegments.length} segments, first: ${seg.words.length} words`);
       }
 
       // Фильтруем пустые слова и ограничиваем количество
@@ -449,7 +451,6 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
 
         // Проверяем временные метки
         if (typeof w.start !== 'number' || typeof w.end !== 'number') {
-          console.log('⚠️ Invalid timestamps:', w);
           continue;
         }
 
@@ -466,10 +467,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
 
         const end = assTime(endTime);
 
-        // Отладка для последнего слова
-        if (j === wordsToProcess.length - 1) {
-          console.log(`🔚 Last word in segment ${i}: "${(w.word || w.text || '').toUpperCase()}" (${w.start}s - ${w.end}s)`);
-        }
+
 
         const lines = splitPhraseToLines(wordsToProcess, 5);
         let phrase = lines.map(lineWords =>
@@ -479,10 +477,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
             wordText = addEmojisToText(wordText, autoEmoji);
             const globalIdx = wordsToProcess.indexOf(word);
 
-            // Отладка для проблемных слов
-            if (!wordText) {
-              console.log('⚠️ Empty word:', word);
-            }
+
 
             if (globalIdx === j) {
               // Активное слово: цветное и увеличенное
@@ -630,57 +625,31 @@ async function processVideo(taskId, videoUrl, transcript, style, title, subtitle
 
     console.log(`📝 Creating ASS file for task ${taskId}`);
 
-    // Добавляем подробное логирование transcript
-    console.log('🔍 Transcript validation:');
-    console.log('  - Is array:', Array.isArray(transcript));
-    console.log('  - Length:', transcript.length);
-    if (transcript.length > 0) {
-      console.log('  - First segment:', JSON.stringify(transcript[0], null, 2));
-      if (transcript[0].words) {
-        console.log('  - First segment words count:', transcript[0].words.length);
-        if (transcript[0].words.length > 0) {
-          console.log('  - First word:', JSON.stringify(transcript[0].words[0], null, 2));
-        }
-      }
-    }
-
     // Создаем ASS файл
-    console.log('🎨 Calling createASSContent with:');
-    console.log('  - style:', style);
-    console.log('  - subtitlePosition:', subtitlePosition);
-    console.log('  - autoEmoji:', autoEmoji);
+    console.log(`📝 Creating ASS file for task ${taskId}`);
+    console.log(`📊 Transcript data:`, {
+      length: transcript.length,
+      firstItem: transcript[0],
+      type: typeof transcript[0],
+      hasWords: transcript[0] && transcript[0].words ? transcript[0].words.length : 'no words'
+    });
     
     const assContent = createASSContent(transcript, style, 720, 1280, subtitlePosition, autoEmoji);
     
-    console.log('✅ ASS content created successfully');
-    console.log('  - Content length:', assContent.length, 'characters');
-    console.log('  - Content preview (first 200 chars):', assContent.substring(0, 200));
-    
     const assPath = path.join(TEMP_DIR, `${taskId}_subtitles.ass`);
     const assDebugPath = path.join(OUTPUT_DIR, `${taskId}_debug.ass`);
-    
-    console.log('📁 File paths:');
-    console.log('  - ASS file path:', assPath);
-    console.log('  - ASS debug path:', assDebugPath);
-    
-    // Проверяем существование папок
-    console.log('📁 Directory check:');
-    console.log('  - TEMP_DIR exists:', await fs.pathExists(TEMP_DIR));
-    console.log('  - OUTPUT_DIR exists:', await fs.pathExists(OUTPUT_DIR));
-    
-    // Логируем путь к debug-файлу
-    console.log('ASS debug file saved to:', assDebugPath);
     
     // Записываем файлы
     await fs.writeFile(assPath, assContent, 'utf8');
     await fs.writeFile(assDebugPath, assContent, 'utf8');
     
-    // Проверяем, что файлы создались
-    console.log('✅ Files written successfully');
-    console.log('  - ASS file exists:', await fs.pathExists(assPath));
-    console.log('  - ASS file size:', (await fs.stat(assPath)).size, 'bytes');
-    console.log('  - Debug file exists:', await fs.pathExists(assDebugPath));
-    console.log('  - Debug file size:', (await fs.stat(assDebugPath)).size, 'bytes');
+    const assStats = await fs.stat(assPath);
+    console.log(`✅ ASS files created: ${assContent.length} chars, ${assStats.size} bytes`);
+    console.log(`📄 ASS content preview:`, assContent.substring(0, 500) + '...');
+    
+    // Проверяем есть ли диалоги в ASS файле
+    const dialogueCount = (assContent.match(/^Dialogue:/gm) || []).length;
+    console.log(`💬 Dialogue lines in ASS: ${dialogueCount}`);
 
     task.progress = 40;
     task.status = 'processing';
@@ -688,65 +657,16 @@ async function processVideo(taskId, videoUrl, transcript, style, title, subtitle
     console.log(`🎬 Processing video with FFmpeg for task ${taskId}`);
     console.log('transcript:', transcript);
 
-    // Добавляем проверку ASS файла перед FFmpeg
-    console.log('🔍 Pre-FFmpeg ASS file check:');
-    console.log('  - ASS file path:', assPath);
-    console.log('  - ASS file exists:', await fs.pathExists(assPath));
-    if (await fs.pathExists(assPath)) {
-      console.log('  - ASS file size:', (await fs.stat(assPath)).size, 'bytes');
-      console.log('  - ASS file content (first 10 lines):');
-      const assFileContent = await fs.readFile(assPath, 'utf8');
-      const lines = assFileContent.split('\n').slice(0, 10);
-      lines.forEach((line, i) => console.log(`    ${i + 1}: ${line}`));
-    } else {
-      console.log('❌ ASS file does not exist! This will cause subtitle:0KiB error!');
-    }
-
     // Обрабатываем видео с FFmpeg
     const outputPath = path.join(OUTPUT_DIR, `${taskId}_output.mp4`);
     
-    // Дополнительная проверка ASS файла перед FFmpeg
-    console.log('🚨 CRITICAL CHECK - ASS file before FFmpeg:');
-    console.log('  - ASS path:', assPath);
-    console.log('  - ASS exists:', await fs.pathExists(assPath));
-    if (await fs.pathExists(assPath)) {
-      const stats = await fs.stat(assPath);
-      console.log('  - ASS size:', stats.size, 'bytes');
-      console.log('  - ASS permissions:', stats.mode);
-      
-      // Читаем первые и последние строки ASS файла
-      const content = await fs.readFile(assPath, 'utf8');
-      const lines = content.split('\n');
-      console.log('  - ASS first 5 lines:');
-      lines.slice(0, 5).forEach((line, i) => console.log(`    ${i + 1}: ${line}`));
-      console.log('  - ASS last 5 lines:');
-      lines.slice(-5).forEach((line, i) => console.log(`    ${lines.length - 4 + i}: ${line}`));
-      
-      // Проверяем, есть ли диалоги в ASS файле
-      const dialogueLines = lines.filter(line => line.startsWith('Dialogue:'));
-      console.log('  - Dialogue lines count:', dialogueLines.length);
-      if (dialogueLines.length > 0) {
-        console.log('  - First dialogue:', dialogueLines[0]);
-        console.log('  - Last dialogue:', dialogueLines[dialogueLines.length - 1]);
-      }
-      
-      // Проверяем содержимое ASS файла на валидность
-      console.log('  - ASS file validation:');
-      console.log('    - Has [Script Info]:', content.includes('[Script Info]'));
-      console.log('    - Has [V4+ Styles]:', content.includes('[V4+ Styles]'));
-      console.log('    - Has [Events]:', content.includes('[Events]'));
-      console.log('    - Has Style definition:', content.includes('Style: Default'));
-      console.log('    - Has Format line:', content.includes('Format: Layer, Start, End, Style'));
-    } else {
-      console.log('❌ ASS FILE DOES NOT EXIST! This will cause subtitle:0KiB!');
+    // Проверяем ASS файл перед FFmpeg
+    if (!await fs.pathExists(assPath)) {
+      throw new Error('ASS file not found before FFmpeg processing');
     }
     
-    // Создаем полную FFmpeg команду для логирования
-    const ffmpegCommand = `ffmpeg -i "${videoPath}" -vf "subtitles='${assPath}'" -c:v libx264 -c:a copy -crf 20 "${outputPath}"`;
-    console.log('🔧 Full FFmpeg command that will be executed:');
-    console.log('  - Command:', ffmpegCommand);
-    console.log('  - ASS path in quotes:', `'${assPath}'`);
-    console.log('  - ASS path exists when command created:', fs.existsSync(assPath));
+    const assFileStats = await fs.stat(assPath);
+    console.log(`🎬 Starting FFmpeg with ASS file: ${assFileStats.size} bytes`);
     
     await new Promise((resolve, reject) => {
       ffmpeg(videoPath)
@@ -757,31 +677,7 @@ async function processVideo(taskId, videoUrl, transcript, style, title, subtitle
         .output(outputPath)
         .on('start', (commandLine) => {
           console.log(`🔧 FFmpeg command: ${commandLine}`);
-          console.log(`🔍 ASS file details in FFmpeg command:`);
-          console.log(`  - ASS path in command: ${assPath}`);
-          console.log(`  - ASS file exists when FFmpeg starts: ${fs.existsSync(assPath)}`);
-          console.log(`  - ASS file size when FFmpeg starts: ${fs.existsSync(assPath) ? fs.statSync(assPath).size : 'N/A'} bytes`);
-          
-          // Проверяем содержимое ASS файла прямо перед FFmpeg
-          if (fs.existsSync(assPath)) {
-            try {
-              const content = fs.readFileSync(assPath, 'utf8');
-              const lines = content.split('\n');
-              const dialogueCount = lines.filter(line => line.startsWith('Dialogue:')).length;
-              console.log(`  - ASS file content check:`);
-              console.log(`    - Total lines: ${lines.length}`);
-              console.log(`    - Dialogue lines: ${dialogueCount}`);
-              console.log(`    - File ends with: ${lines[lines.length - 1]}`);
-              
-              // Проверяем, что FFmpeg видит в команде
-              console.log(`  - FFmpeg command analysis:`);
-              console.log(`    - Command contains subtitles filter: ${commandLine.includes('subtitles')}`);
-              console.log(`    - Command contains ASS path: ${commandLine.includes(assPath)}`);
-              console.log(`    - Full filter string: ${commandLine.match(/-vf "([^"]+)"/)?.[1] || 'NOT FOUND'}`);
-            } catch (err) {
-              console.log(`  - Error reading ASS file: ${err.message}`);
-            }
-          }
+          console.log(`🎯 Subtitles filter: ${commandLine.includes('subtitles') ? '✅ INCLUDED' : '❌ MISSING!'}`);
         })
         .on('stderr', (stderrLine) => {
           console.log('FFmpeg stderr:', stderrLine);
