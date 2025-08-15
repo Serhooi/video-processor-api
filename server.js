@@ -727,10 +727,26 @@ async function processVideo(taskId, videoUrl, transcript, style, title, subtitle
       console.log('  - Dialogue lines count:', dialogueLines.length);
       if (dialogueLines.length > 0) {
         console.log('  - First dialogue:', dialogueLines[0]);
+        console.log('  - Last dialogue:', dialogueLines[dialogueLines.length - 1]);
       }
+      
+      // Проверяем содержимое ASS файла на валидность
+      console.log('  - ASS file validation:');
+      console.log('    - Has [Script Info]:', content.includes('[Script Info]'));
+      console.log('    - Has [V4+ Styles]:', content.includes('[V4+ Styles]'));
+      console.log('    - Has [Events]:', content.includes('[Events]'));
+      console.log('    - Has Style definition:', content.includes('Style: Default'));
+      console.log('    - Has Format line:', content.includes('Format: Layer, Start, End, Style'));
     } else {
       console.log('❌ ASS FILE DOES NOT EXIST! This will cause subtitle:0KiB!');
     }
+    
+    // Создаем полную FFmpeg команду для логирования
+    const ffmpegCommand = `ffmpeg -i "${videoPath}" -vf "subtitles='${assPath}'" -c:v libx264 -c:a copy -crf 20 "${outputPath}"`;
+    console.log('🔧 Full FFmpeg command that will be executed:');
+    console.log('  - Command:', ffmpegCommand);
+    console.log('  - ASS path in quotes:', `'${assPath}'`);
+    console.log('  - ASS path exists when command created:', fs.existsSync(assPath));
     
     await new Promise((resolve, reject) => {
       ffmpeg(videoPath)
@@ -756,6 +772,12 @@ async function processVideo(taskId, videoUrl, transcript, style, title, subtitle
               console.log(`    - Total lines: ${lines.length}`);
               console.log(`    - Dialogue lines: ${dialogueCount}`);
               console.log(`    - File ends with: ${lines[lines.length - 1]}`);
+              
+              // Проверяем, что FFmpeg видит в команде
+              console.log(`  - FFmpeg command analysis:`);
+              console.log(`    - Command contains subtitles filter: ${commandLine.includes('subtitles')}`);
+              console.log(`    - Command contains ASS path: ${commandLine.includes(assPath)}`);
+              console.log(`    - Full filter string: ${commandLine.match(/-vf "([^"]+)"/)?.[1] || 'NOT FOUND'}`);
             } catch (err) {
               console.log(`  - Error reading ASS file: ${err.message}`);
             }
