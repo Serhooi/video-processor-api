@@ -161,13 +161,13 @@ function getASSStyles(style, videoWidth = 720, videoHeight = 1280) {
   return styles[style] || styles.modern;
 }
 
-function splitPhraseToLines(words, maxWordsPerLine = 5) {
-  // Строго максимум две строки
+function splitPhraseToLines(words, maxWordsPerLine = 3) {
+  // Максимум 2-3 строки для читаемости
   if (words.length <= maxWordsPerLine) {
     return [words];
   }
 
-  // Максимум 10 слов всего (5 слов на строку)
+  // Максимум 6 слов всего (3 слова на строку, максимум 2 строки)
   const maxTotalWords = maxWordsPerLine * 2;
   const wordsToUse = words.length > maxTotalWords ? words.slice(0, maxTotalWords) : words;
 
@@ -388,8 +388,8 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   if (segments && segments.length > 0 && segments[0].word && !segments[0].words) {
     console.log('🔄 Converting word array to segments format');
     
-    // НОВОЕ ИСПРАВЛЕНИЕ: Группируем слова в сегменты по 8-10 слов для лучшей производительности
-    const wordsPerSegment = 10;
+    // ИСПРАВЛЕНИЕ: Группируем слова в сегменты по 5-6 слов для читаемости (максимум 2-3 строки)
+    const wordsPerSegment = 6;
     processedSegments = [];
     
     for (let i = 0; i < segments.length; i += wordsPerSegment) {
@@ -484,7 +484,7 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
 
 
 
-        const lines = splitPhraseToLines(wordsToProcess, 5);
+        const lines = splitPhraseToLines(wordsToProcess, 3);
         let phrase = lines.map(lineWords =>
           lineWords.map((word) => {
             // Улучшенная обработка текста слова (безопасное преобразование + эмоджи)
