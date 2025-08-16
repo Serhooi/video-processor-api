@@ -484,60 +484,33 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
       const maxWords = 10;
       const wordsToProcess = validWords.length > maxWords ? validWords.slice(0, maxWords) : validWords;
 
-      // Для каждого слова создаем отдельный диалог где только оно активное
-      for (let j = 0; j < wordsToProcess.length; j++) {
-        const w = wordsToProcess[j];
-
-        // Проверяем временные метки
-        if (typeof w.start !== 'number' || typeof w.end !== 'number') {
-          continue;
-        }
-
-        const start = assTime(w.start);
-
-        // Продлеваем диалог до начала следующего слова чтобы избежать пропадания
-        // ИСПРАВЛЕНИЕ: Строгие временные рамки чтобы избежать пересечений
-        let endTime = w.end;
-        if (j < wordsToProcess.length - 1) {
-          const nextWord = wordsToProcess[j + 1];
-          // Заканчиваем строго перед началом следующего слова
-          endTime = Math.min(w.end, nextWord.start - 0.01);
-        } else {
-          // Для последнего слова в сегменте - используем его оригинальное время
-          endTime = w.end;
-        }
+      // ИСПРАВЛЕНИЕ: Создаем один непрерывный диалог для всего сегмента
+      if (wordsToProcess.length > 0) {
+        const segmentStart = wordsToProcess[0].start;
+        const segmentEnd = wordsToProcess[wordsToProcess.length - 1].end;
         
-        // Минимальная длительность 0.1 секунды
-        if (endTime <= w.start) {
-          endTime = w.start + 0.1;
-        }
-
-        const end = assTime(endTime);
-
-
-
+        const start = assTime(segmentStart);
+        const end = assTime(segmentEnd);
+        
+        // Создаем karaoke эффект с временными метками для каждого слова
         const lines = splitPhraseToLines(wordsToProcess, 3);
         let phrase = lines.map(lineWords =>
           lineWords.map((word) => {
-            // Улучшенная обработка текста слова (безопасное преобразование + эмоджи)
+            // Улучшенная обработка текста слова
             let wordText = safeTextTransform(word.text || word.word || word.Text || word.Word || '');
             wordText = addEmojisToText(wordText, autoEmoji);
-            const globalIdx = wordsToProcess.indexOf(word);
-
-
-
-            if (globalIdx === j) {
-              // Активное слово: цветное и увеличенное
-              return `{\\c${activeColor}\\b1\\shad3\\4c${blackShadow}\\fs${activeFontSize}}${wordText}{\\r}`;
-            } else {
-              // Обычное слово: белое обычного размера
-              return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}}${wordText}{\\r}`;
-            }
+            
+            // Вычисляем длительность слова в сантисекундах для karaoke
+            const wordDuration = Math.max(10, Math.round((word.end - word.start) * 100));
+            
+            // Используем karaoke эффект {\k} для плавного выделения
+            return `{\\k${wordDuration}}${wordText}`;
           }).filter(text => text.trim() !== '').join(' ')
         ).filter(line => line.trim() !== '').join('\\N');
 
         if (phrase.trim()) {
-          ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
+          // Один диалог на весь сегмент с karaoke эффектом
+          ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}\\2c${activeColor}}${phrase}\n`;
         }
       }
     } else {
