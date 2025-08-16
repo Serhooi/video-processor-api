@@ -439,7 +439,36 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
   // Заполняем паузы между сегментами
   const finalSegments = fillGaps(processedSegments, 1.5); // Уменьшили до 1.5 сек
 
-  finalSegments.forEach((seg, i) => {
+  // ИСПРАВЛЕНИЕ: Предотвращаем пересечение сегментов по времени
+  function preventSegmentOverlap(segments) {
+    for (let i = 0; i < segments.length - 1; i++) {
+      const currentSeg = segments[i];
+      const nextSeg = segments[i + 1];
+      
+      if (currentSeg.words && currentSeg.words.length > 0 && 
+          nextSeg.words && nextSeg.words.length > 0) {
+        
+        const currentLastWord = currentSeg.words[currentSeg.words.length - 1];
+        const nextFirstWord = nextSeg.words[0];
+        
+        // Если сегменты пересекаются, добавляем зазор
+        if (currentLastWord.end > nextFirstWord.start) {
+          const gap = 0.2; // 200ms зазор между сегментами
+          const midPoint = (currentLastWord.end + nextFirstWord.start) / 2;
+          
+          currentLastWord.end = midPoint - gap / 2;
+          nextFirstWord.start = midPoint + gap / 2;
+          
+          console.log(`🔧 Fixed overlap between segment ${i + 1} and ${i + 2}`);
+        }
+      }
+    }
+    return segments;
+  }
+  
+  const nonOverlappingSegments = preventSegmentOverlap(finalSegments);
+
+  nonOverlappingSegments.forEach((seg, i) => {
     if (Array.isArray(seg.words) && seg.words.length > 0) {
       // Минимальное логирование для отладки
       if (i === 0) {
@@ -467,17 +496,20 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
         const start = assTime(w.start);
 
         // Продлеваем диалог до начала следующего слова чтобы избежать пропадания
-        // ИСПРАВЛЕНИЕ: Продлеваем время показа каждого слова чтобы избежать пропадания
+        // ИСПРАВЛЕНИЕ: Строгие временные рамки чтобы избежать пересечений
         let endTime = w.end;
         if (j < wordsToProcess.length - 1) {
           const nextWord = wordsToProcess[j + 1];
-          // Продлеваем до начала следующего слова, но минимум на 0.3 секунды
-          if (nextWord.start > w.end) {
-            endTime = Math.max(w.end, Math.min(nextWord.start - 0.05, w.start + 0.3));
-          }
+          // Заканчиваем строго перед началом следующего слова
+          endTime = Math.min(w.end, nextWord.start - 0.01);
         } else {
-          // Для последнего слова в сегменте продлеваем минимум на 0.5 секунды
-          endTime = Math.max(w.end, w.start + 0.5);
+          // Для последнего слова в сегменте - используем его оригинальное время
+          endTime = w.end;
+        }
+        
+        // Минимальная длительность 0.1 секунды
+        if (endTime <= w.start) {
+          endTime = w.start + 0.1;
         }
 
         const end = assTime(endTime);
