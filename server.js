@@ -484,33 +484,55 @@ function createASSContent(segments, style = 'modern', videoWidth = 720, videoHei
       const maxWords = 10;
       const wordsToProcess = validWords.length > maxWords ? validWords.slice(0, maxWords) : validWords;
 
-      // ИСПРАВЛЕНИЕ: Создаем один непрерывный диалог для всего сегмента
+      // ИСПРАВЛЕНИЕ: Создаем непрерывные диалоги без промежутков, но с правильными цветами
       if (wordsToProcess.length > 0) {
         const segmentStart = wordsToProcess[0].start;
         const segmentEnd = wordsToProcess[wordsToProcess.length - 1].end;
         
-        const start = assTime(segmentStart);
-        const end = assTime(segmentEnd);
-        
-        // Создаем karaoke эффект с временными метками для каждого слова
-        const lines = splitPhraseToLines(wordsToProcess, 3);
-        let phrase = lines.map(lineWords =>
-          lineWords.map((word) => {
-            // Улучшенная обработка текста слова
-            let wordText = safeTextTransform(word.text || word.word || word.Text || word.Word || '');
-            wordText = addEmojisToText(wordText, autoEmoji);
-            
-            // Вычисляем длительность слова в сантисекундах для karaoke
-            const wordDuration = Math.max(10, Math.round((word.end - word.start) * 100));
-            
-            // Используем karaoke эффект {\k} для плавного выделения
-            return `{\\k${wordDuration}}${wordText}`;
-          }).filter(text => text.trim() !== '').join(' ')
-        ).filter(line => line.trim() !== '').join('\\N');
-
-        if (phrase.trim()) {
-          // Один диалог на весь сегмент с karaoke эффектом
-          ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}\\2c${activeColor}}${phrase}\n`;
+        // Для каждого слова создаем диалог, но продлеваем время до следующего слова
+        for (let j = 0; j < wordsToProcess.length; j++) {
+          const w = wordsToProcess[j];
+          
+          if (typeof w.start !== 'number' || typeof w.end !== 'number') {
+            continue;
+          }
+          
+          const start = assTime(w.start);
+          
+          // ИСПРАВЛЕНИЕ: Продлеваем до начала следующего слова чтобы убрать промежутки
+          let endTime = w.end;
+          if (j < wordsToProcess.length - 1) {
+            const nextWord = wordsToProcess[j + 1];
+            // Продлеваем до начала следующего слова (убираем промежуток)
+            endTime = nextWord.start;
+          } else {
+            // Последнее слово - используем его время
+            endTime = w.end;
+          }
+          
+          const end = assTime(endTime);
+          
+          // Создаем фразу с правильными цветами
+          const lines = splitPhraseToLines(wordsToProcess, 3);
+          let phrase = lines.map(lineWords =>
+            lineWords.map((word) => {
+              let wordText = safeTextTransform(word.text || word.word || word.Text || word.Word || '');
+              wordText = addEmojisToText(wordText, autoEmoji);
+              const globalIdx = wordsToProcess.indexOf(word);
+              
+              if (globalIdx === j) {
+                // Активное слово: цветное и увеличенное
+                return `{\\c${activeColor}\\b1\\shad3\\4c${blackShadow}\\fs${activeFontSize}}${wordText}{\\r}`;
+              } else {
+                // Обычное слово: белое обычного размера
+                return `{\\c${whiteColor}\\b1\\shad3\\4c${blackShadow}\\fs${baseFontSize}}${wordText}{\\r}`;
+              }
+            }).filter(text => text.trim() !== '').join(' ')
+          ).filter(line => line.trim() !== '').join('\\N');
+          
+          if (phrase.trim()) {
+            ass += `Dialogue: 0,${start},${end},Default,,0,0,0,,${phrase}\n`;
+          }
         }
       }
     } else {
