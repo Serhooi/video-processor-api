@@ -4,12 +4,15 @@ FROM node:18-alpine
 # Установим зависимости для ffmpeg и рендеринга субтитров
 RUN apk add --no-cache curl ca-certificates fontconfig freetype ttf-dejavu
 
-# Скачиваем архив во временную папку
+# Скачиваем и устанавливаем статический FFmpeg
 RUN curl -L -o /tmp/ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz \
-    && tar -xJf /tmp/ffmpeg.tar.xz -C /tmp \
-    && cp /tmp/ffmpeg-*-static/ffmpeg /usr/local/bin/ \
-    && cp /tmp/ffmpeg-*-static/ffprobe /usr/local/bin/ \
-    && rm -rf /tmp/ffmpeg*
+    && cd /tmp \
+    && tar -xJf ffmpeg.tar.xz \
+    && find . -name "ffmpeg" -type f -exec cp {} /usr/local/bin/ \; \
+    && find . -name "ffprobe" -type f -exec cp {} /usr/local/bin/ \; \
+    && chmod +x /usr/local/bin/ffmpeg /usr/local/bin/ffprobe \
+    && rm -rf /tmp/ffmpeg* \
+    && ffmpeg -version
 
 # Добавляю Montserrat-Bold.ttf для ASS-стилей
 RUN mkdir -p /usr/share/fonts/montserrat \
